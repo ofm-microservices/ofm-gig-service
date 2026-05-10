@@ -24,11 +24,11 @@ var _ = Describe("Config", func() {
 		GinkgoT().Setenv("DB_PASSWORD", "secret")
 		GinkgoT().Setenv("DB_NAME", "gig_service")
 		GinkgoT().Setenv("GRPC_HOST", "127.0.0.1")
-		GinkgoT().Setenv("GRPC_PORT", "9093")
+		GinkgoT().Setenv("GRPC_PORT", "9503")
 		GinkgoT().Setenv("REDIS_HOST", "redis")
 		GinkgoT().Setenv("REDIS_PORT", "6380")
 		GinkgoT().Setenv("NATS_URL", "nats://127.0.0.1:4222")
-		GinkgoT().Setenv("FILE_SERVICE_ADDRESS", "127.0.0.1:9096")
+		GinkgoT().Setenv("FILE_SERVICE_ADDRESS", "127.0.0.1:9504")
 
 		cfg, err := Load()
 
@@ -36,9 +36,9 @@ var _ = Describe("Config", func() {
 		Expect(cfg.App.Env).To(Equal("test"))
 		Expect(cfg.App.LogLevel).To(Equal("debug"))
 		Expect(cfg.DB.Host).To(Equal("db"))
-		Expect(cfg.GRPC.Port).To(Equal(9093))
+		Expect(cfg.GRPC.Port).To(Equal(9503))
 		Expect(cfg.Redis.Port).To(Equal(6380))
-		Expect(cfg.FileService.Address).To(Equal("127.0.0.1:9096"))
+		Expect(cfg.FileService.Address).To(Equal("127.0.0.1:9504"))
 	})
 
 	It("wraps parsing errors", func() {
@@ -50,11 +50,11 @@ var _ = Describe("Config", func() {
 		GinkgoT().Setenv("DB_PASSWORD", "secret")
 		GinkgoT().Setenv("DB_NAME", "gig_service")
 		GinkgoT().Setenv("GRPC_HOST", "127.0.0.1")
-		GinkgoT().Setenv("GRPC_PORT", "9093")
+		GinkgoT().Setenv("GRPC_PORT", "9503")
 		GinkgoT().Setenv("REDIS_HOST", "redis")
 		GinkgoT().Setenv("REDIS_PORT", "6380")
 		GinkgoT().Setenv("NATS_URL", "nats://127.0.0.1:4222")
-		GinkgoT().Setenv("FILE_SERVICE_ADDRESS", "127.0.0.1:9096")
+		GinkgoT().Setenv("FILE_SERVICE_ADDRESS", "127.0.0.1:9504")
 
 		cfg, err := Load()
 

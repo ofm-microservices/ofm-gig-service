@@ -4,8 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"sync"
 	"strconv"
+	"sync"
 	"testing"
 
 	"gig-service/config"
@@ -13,13 +13,13 @@ import (
 	"gig-service/internal/domain"
 	filegrpc "gig-service/internal/infra/file/grpc"
 	eventbroker "gig-service/internal/presentation/event_broker"
-	"github.com/alicebob/miniredis/v2"
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/alicebob/miniredis/v2"
 	"github.com/jmoiron/sqlx"
-	"github.com/redis/go-redis/v9"
 	"github.com/ofm-microservices/ofm-common/pkg/logging"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/fx"
 )
 
@@ -68,11 +68,13 @@ func (f *fakeEventBroker) Close() { f.closed = true }
 type fakeProjectionWriter struct{ upserts int }
 
 func (w *fakeProjectionWriter) Upsert(context.Context, *domain.Gig) error { w.upserts++; return nil }
-func (w *fakeProjectionWriter) DeleteByID(context.Context, string) error   { return nil }
+func (w *fakeProjectionWriter) DeleteByID(context.Context, string) error  { return nil }
 
 type fakeGigService struct{}
 
-func (fakeGigService) CreateDraft(context.Context, string) (*domain.Gig, error) { return &domain.Gig{ID: "gig-1"}, nil }
+func (fakeGigService) CreateDraft(context.Context, string) (*domain.Gig, error) {
+	return &domain.Gig{ID: "gig-1"}, nil
+}
 func (fakeGigService) UpdateBasicInfo(context.Context, string, string, domain.UpdateBasicInfoParams) (*domain.Gig, error) {
 	return &domain.Gig{ID: "gig-1"}, nil
 }
@@ -85,8 +87,12 @@ func (fakeGigService) ReplaceQuestions(context.Context, string, string, domain.R
 func (fakeGigService) ReplaceMedia(context.Context, string, string, domain.ReplaceMediaUploadParams) (*domain.Gig, error) {
 	return &domain.Gig{ID: "gig-1"}, nil
 }
-func (fakeGigService) GetByID(context.Context, string, string) (*domain.Gig, error) { return &domain.Gig{ID: "gig-1"}, nil }
-func (fakeGigService) Publish(context.Context, string, string) (*domain.Gig, error) { return &domain.Gig{ID: "gig-1"}, nil }
+func (fakeGigService) GetByID(context.Context, string, string) (*domain.Gig, error) {
+	return &domain.Gig{ID: "gig-1"}, nil
+}
+func (fakeGigService) Publish(context.Context, string, string) (*domain.Gig, error) {
+	return &domain.Gig{ID: "gig-1"}, nil
+}
 
 type fakeServer struct {
 	started  bool
@@ -129,7 +135,7 @@ var _ = Describe("fx providers and invokes", func() {
 		GinkgoT().Setenv("DB_USER", "user")
 		GinkgoT().Setenv("DB_PASSWORD", "pass")
 		GinkgoT().Setenv("DB_NAME", "gig_service")
-		GinkgoT().Setenv("GRPC_PORT", "9093")
+		GinkgoT().Setenv("GRPC_PORT", "9503")
 		GinkgoT().Setenv("REDIS_HOST", "redis")
 		GinkgoT().Setenv("REDIS_PORT", "6380")
 		GinkgoT().Setenv("NATS_URL", "nats://127.0.0.1:4222")
@@ -285,7 +291,9 @@ var _ = Describe("fx providers and invokes", func() {
 		ensureStream = func(config.NATSConfig, logging.Logger) error { return errors.New("ensure") }
 		Expect(InvokeEnsureStream(&config.Config{NATS: config.NATSConfig{URL: "nats://127.0.0.1:4222"}}, lg)).To(MatchError(ContainSubstring("ensure")))
 
-		newEventBroker = func(config.NATSConfig, logging.Logger) (eventbroker.EventBroker, error) { return nil, errors.New("broker") }
+		newEventBroker = func(config.NATSConfig, logging.Logger) (eventbroker.EventBroker, error) {
+			return nil, errors.New("broker")
+		}
 		brokerOut, err := ProvideEventBroker(&fakeLifecycle{}, &config.Config{NATS: config.NATSConfig{URL: "nats://127.0.0.1:4222"}}, lg)
 		Expect(brokerOut).To(BeNil())
 		Expect(err).To(MatchError(ContainSubstring("broker")))

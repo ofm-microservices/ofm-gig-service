@@ -7,6 +7,7 @@ import (
 	"net"
 
 	"github.com/ofm-microservices/ofm-common/pkg/logging"
+	"github.com/ofm-microservices/ofm-common/pkg/observability/metrics"
 	gigv1 "github.com/ofm-microservices/ofm-common/proto/gig/v1"
 	"google.golang.org/grpc"
 )
@@ -30,7 +31,7 @@ func NewServer(svc GigService, cfg config.GRPCConfig, log logging.Logger) (Serve
 		return nil, ErrNilLogger
 	}
 
-	grpcSrv := grpc.NewServer()
+	grpcSrv := grpc.NewServer(grpc.UnaryInterceptor(metrics.UnaryServerInterceptor()))
 	s := &server{
 		svc:  svc,
 		cfg:  cfg,

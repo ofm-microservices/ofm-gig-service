@@ -6,9 +6,11 @@ import (
 	"gig-service/internal/domain"
 	"gig-service/internal/infra/write/yugabyte/mapper"
 	"gig-service/internal/infra/write/yugabyte/model"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+	"github.com/ofm-microservices/ofm-common/pkg/observability/metrics"
 )
 
 type repo struct {
@@ -29,6 +31,10 @@ func New(db *sqlx.DB, translator DBErrorTranslator) (domain.GigRepository, error
 }
 
 func (r *repo) CreateDraft(ctx context.Context, params domain.CreateDraftParams) (*domain.Gig, error) {
+	started := time.Now()
+	status := "success"
+	defer func() { metrics.Global().ObserveDB("yugabyte", "create_draft", "gigs", status, time.Since(started)) }()
+
 	row := model.GigRow{
 		ID:                    uuid.Must(uuid.NewV7()).String(),
 		FreelancerID:          params.FreelancerID,
@@ -59,13 +65,24 @@ func (r *repo) CreateDraft(ctx context.Context, params domain.CreateDraftParams)
 		&row.CreatedAt,
 		&row.UpdatedAt,
 	); err != nil {
+		status = "error"
 		return nil, r.translator.TranslateCreateGigError(err)
 	}
 
-	return r.loadGig(ctx, row.ID, row)
+	gig, err := r.loadGig(ctx, row.ID, row)
+	if err != nil {
+		status = "error"
+	}
+	return gig, err
 }
 
 func (r *repo) UpdateBasicInfo(ctx context.Context, gigID string, params domain.UpdateBasicInfoParams) (*domain.Gig, error) {
+	started := time.Now()
+	status := "success"
+	defer func() {
+		metrics.Global().ObserveDB("yugabyte", "update_basic_info", "gigs", status, time.Since(started))
+	}()
+
 	var row model.GigRow
 	if err := r.db.QueryRowContext(ctx, updateGigBasicInfoQuery, gigID, params.Title, params.Slug, params.Description, params.CategoryID, params.Currency).Scan(
 		&row.ID,
@@ -85,20 +102,35 @@ func (r *repo) UpdateBasicInfo(ctx context.Context, gigID string, params domain.
 		&row.CreatedAt,
 		&row.UpdatedAt,
 	); err != nil {
+		status = "error"
 		return nil, r.translator.TranslateFindGigError(err)
 	}
 
-	return r.loadGig(ctx, gigID, row)
+	gig, err := r.loadGig(ctx, gigID, row)
+	if err != nil {
+		status = "error"
+	}
+	return gig, err
 }
 
 func (r *repo) ReplacePackages(ctx context.Context, gigID string, params domain.ReplacePackagesParams) (*domain.Gig, error) {
+	started := time.Now()
+	status := "success"
+	defer func() {
+		metrics.Global().ObserveDB("yugabyte", "replace_packages", "gig_packages", status, time.Since(started))
+	}()
+
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
+		status = "error"
+		metrics.Global().IncDBTransaction("yugabyte", "error")
 		return nil, r.translator.TranslatePublishGigError(err)
 	}
+	metrics.Global().IncDBTransaction("yugabyte", "started")
 	defer func() { _ = tx.Rollback() }()
 
 	if _, err := tx.ExecContext(ctx, deleteGigPackagesQuery, gigID); err != nil {
+		status = "error"
 		return nil, r.translator.TranslatePublishGigError(err)
 	}
 	for i, pkg := range params.Packages {
@@ -112,27 +144,46 @@ func (r *repo) ReplacePackages(ctx context.Context, gigID string, params domain.
 			SortOrder:    int32(i + 1),
 		}
 		if _, err := tx.ExecContext(ctx, insertGigPackageQuery, row.ID, row.GigID, row.Tier, row.Description, row.DeliveryDays, row.PriceCents, row.SortOrder); err != nil {
+			status = "error"
 			return nil, r.translator.TranslatePublishGigError(err)
 		}
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE gigs SET packages_completed = TRUE, updated_at = NOW() WHERE gig_id = $1`, gigID); err != nil {
+		status = "error"
 		return nil, r.translator.TranslatePublishGigError(err)
 	}
 	if err := tx.Commit(); err != nil {
+		status = "error"
+		metrics.Global().IncDBTransaction("yugabyte", "error")
 		return nil, r.translator.TranslatePublishGigError(err)
 	}
+	metrics.Global().IncDBTransaction("yugabyte", "success")
 
-	return r.GetByID(ctx, gigID)
+	gig, err := r.GetByID(ctx, gigID)
+	if err != nil {
+		status = "error"
+	}
+	return gig, err
 }
 
 func (r *repo) ReplaceQuestions(ctx context.Context, gigID string, params domain.ReplaceQuestionsParams) (*domain.Gig, error) {
+	started := time.Now()
+	status := "success"
+	defer func() {
+		metrics.Global().ObserveDB("yugabyte", "replace_questions", "gig_questions", status, time.Since(started))
+	}()
+
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
+		status = "error"
+		metrics.Global().IncDBTransaction("yugabyte", "error")
 		return nil, r.translator.TranslatePublishGigError(err)
 	}
+	metrics.Global().IncDBTransaction("yugabyte", "started")
 	defer func() { _ = tx.Rollback() }()
 
 	if _, err := tx.ExecContext(ctx, deleteGigQuestionsQuery, gigID); err != nil {
+		status = "error"
 		return nil, r.translator.TranslatePublishGigError(err)
 	}
 	for i, q := range params.Questions {
@@ -143,27 +194,46 @@ func (r *repo) ReplaceQuestions(ctx context.Context, gigID string, params domain
 			SortOrder: int32(i + 1),
 		}
 		if _, err := tx.ExecContext(ctx, insertGigQuestionQuery, row.ID, row.GigID, row.Content, row.SortOrder); err != nil {
+			status = "error"
 			return nil, r.translator.TranslatePublishGigError(err)
 		}
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE gigs SET requirements_completed = TRUE, updated_at = NOW() WHERE gig_id = $1`, gigID); err != nil {
+		status = "error"
 		return nil, r.translator.TranslatePublishGigError(err)
 	}
 	if err := tx.Commit(); err != nil {
+		status = "error"
+		metrics.Global().IncDBTransaction("yugabyte", "error")
 		return nil, r.translator.TranslatePublishGigError(err)
 	}
+	metrics.Global().IncDBTransaction("yugabyte", "success")
 
-	return r.GetByID(ctx, gigID)
+	gig, err := r.GetByID(ctx, gigID)
+	if err != nil {
+		status = "error"
+	}
+	return gig, err
 }
 
 func (r *repo) ReplaceMedia(ctx context.Context, gigID string, params domain.ReplaceMediaParams) (*domain.Gig, error) {
+	started := time.Now()
+	status := "success"
+	defer func() {
+		metrics.Global().ObserveDB("yugabyte", "replace_media", "gig_media", status, time.Since(started))
+	}()
+
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
+		status = "error"
+		metrics.Global().IncDBTransaction("yugabyte", "error")
 		return nil, r.translator.TranslatePublishGigError(err)
 	}
+	metrics.Global().IncDBTransaction("yugabyte", "started")
 	defer func() { _ = tx.Rollback() }()
 
 	if _, err := tx.ExecContext(ctx, deleteGigMediaQuery, gigID); err != nil {
+		status = "error"
 		return nil, r.translator.TranslatePublishGigError(err)
 	}
 	for i, m := range params.Media {
@@ -174,32 +244,54 @@ func (r *repo) ReplaceMedia(ctx context.Context, gigID string, params domain.Rep
 			SortOrder: int32(i + 1),
 		}
 		if _, err := tx.ExecContext(ctx, insertGigMediaQuery, row.ID, row.GigID, row.FileID, row.SortOrder); err != nil {
+			status = "error"
 			return nil, r.translator.TranslatePublishGigError(err)
 		}
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE gigs SET picture_file_id = $2, media_completed = TRUE, updated_at = NOW() WHERE gig_id = $1`, gigID, params.PictureFileID); err != nil {
+		status = "error"
 		return nil, r.translator.TranslatePublishGigError(err)
 	}
 	if err := tx.Commit(); err != nil {
+		status = "error"
+		metrics.Global().IncDBTransaction("yugabyte", "error")
 		return nil, r.translator.TranslatePublishGigError(err)
 	}
+	metrics.Global().IncDBTransaction("yugabyte", "success")
 
-	return r.GetByID(ctx, gigID)
+	gig, err := r.GetByID(ctx, gigID)
+	if err != nil {
+		status = "error"
+	}
+	return gig, err
 }
 
 func (r *repo) GetByID(ctx context.Context, gigID string) (*domain.Gig, error) {
+	started := time.Now()
+	status := "success"
+	defer func() { metrics.Global().ObserveDB("yugabyte", "get_by_id", "gigs", status, time.Since(started)) }()
+
 	var row model.GigRow
 	if err := r.db.GetContext(ctx, &row, getGigQuery, gigID); err != nil {
+		status = "error"
 		if err == sql.ErrNoRows {
 			return nil, domain.ErrGigNotFound
 		}
 		return nil, r.translator.TranslateFindGigError(err)
 	}
 
-	return r.loadGig(ctx, gigID, row)
+	gig, err := r.loadGig(ctx, gigID, row)
+	if err != nil {
+		status = "error"
+	}
+	return gig, err
 }
 
 func (r *repo) Publish(ctx context.Context, gigID string) (*domain.Gig, error) {
+	started := time.Now()
+	status := "success"
+	defer func() { metrics.Global().ObserveDB("yugabyte", "publish", "gigs", status, time.Since(started)) }()
+
 	var row model.GigRow
 	if err := r.db.QueryRowContext(ctx, publishGigQuery, gigID).Scan(
 		&row.ID,
@@ -219,10 +311,15 @@ func (r *repo) Publish(ctx context.Context, gigID string) (*domain.Gig, error) {
 		&row.CreatedAt,
 		&row.UpdatedAt,
 	); err != nil {
+		status = "error"
 		return nil, r.translator.TranslatePublishGigError(err)
 	}
 
-	return r.loadGig(ctx, gigID, row)
+	gig, err := r.loadGig(ctx, gigID, row)
+	if err != nil {
+		status = "error"
+	}
+	return gig, err
 }
 
 func (r *repo) loadGig(ctx context.Context, gigID string, row model.GigRow) (*domain.Gig, error) {
