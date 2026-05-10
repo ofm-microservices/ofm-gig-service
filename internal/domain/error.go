@@ -1,0 +1,33 @@
+package domain
+
+import "errors"
+
+var (
+	ErrInvalidGigID                = errors.New("invalid gig id")
+	ErrInvalidFreelancerID         = errors.New("invalid freelancer id")
+	ErrInvalidTitle                = errors.New("invalid title")
+	ErrInvalidDescription          = errors.New("invalid description")
+	ErrInvalidCategoryID           = errors.New("invalid category id")
+	ErrInvalidCurrency             = errors.New("invalid currency")
+	ErrInvalidPackageTier          = errors.New("invalid package tier")
+	ErrInvalidPackageDescription   = errors.New("invalid package description")
+	ErrInvalidPackageDeliveryDays  = errors.New("invalid package delivery days")
+	ErrInvalidPackagePriceCents    = errors.New("invalid package price cents")
+	ErrInvalidQuestionContent      = errors.New("invalid question content")
+	ErrInvalidMediaUpload          = errors.New("invalid media upload")
+	ErrInvalidFileID               = errors.New("invalid file id")
+	ErrInvalidMediaRef             = ErrInvalidFileID
+	ErrInvalidPackageCount         = errors.New("invalid package count")
+	ErrInvalidGigState             = errors.New("invalid gig state")
+	ErrGigNotFound                 = errors.New("gig not found")
+	ErrGigAlreadyExists            = errors.New("gig already exists")
+	ErrGigDraftIncomplete          = errors.New("gig draft is incomplete")
+	ErrGigAlreadyPublished         = errors.New("gig already published")
+	ErrFailedToCreateGig           = errors.New("failed to create gig")
+	ErrFailedToUpdateGig           = errors.New("failed to update gig")
+	ErrFailedToPublishGig          = errors.New("failed to publish gig")
+	ErrFailedToFindGig             = errors.New("failed to find gig")
+	ErrFailedToReplaceGigPackages  = errors.New("failed to replace gig packages")
+	ErrFailedToReplaceGigQuestions = errors.New("failed to replace gig questions")
+	ErrFailedToReplaceGigMedia     = errors.New("failed to replace gig media")
+)

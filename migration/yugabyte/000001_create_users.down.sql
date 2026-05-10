@@ -1,0 +1,4 @@
+DROP TABLE IF EXISTS gig_media;
+DROP TABLE IF EXISTS gig_questions;
+DROP TABLE IF EXISTS gig_packages;
+DROP TABLE IF EXISTS gigs;
