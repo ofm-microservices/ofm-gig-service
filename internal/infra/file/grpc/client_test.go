@@ -6,8 +6,8 @@ import (
 
 	"gig-service/config"
 	"gig-service/internal/domain"
-	filev1 "github.com/ofm-microseervices/ofm-common/proto/file/v1"
-	"github.com/ofm-microseervices/ofm-common/pkg/logging"
+	filev1 "github.com/ofm-microservices/ofm-common/proto/file/v1"
+	"github.com/ofm-microservices/ofm-common/pkg/logging"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"google.golang.org/grpc"

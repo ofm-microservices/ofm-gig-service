@@ -17,7 +17,7 @@ import (
 	reflect "reflect"
 
 	nats_go "github.com/nats-io/nats.go"
-	logging "github.com/ofm-microseervices/ofm-common/pkg/logging"
+	logging "github.com/ofm-microservices/ofm-common/pkg/logging"
 	gomock "go.uber.org/mock/gomock"
 )
 

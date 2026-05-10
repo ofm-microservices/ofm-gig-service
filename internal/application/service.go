@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 	"gig-service/internal/domain"
-	"github.com/ofm-microseervices/ofm-common/pkg/logging"
+	"github.com/ofm-microservices/ofm-common/pkg/logging"
 	"strings"
 )
 

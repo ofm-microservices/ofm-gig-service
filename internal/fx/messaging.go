@@ -6,7 +6,7 @@ import (
 	eventbroker "gig-service/internal/presentation/event_broker"
 	broker "gig-service/internal/presentation/event_broker/nats"
 	natsbootstrap "gig-service/pkg/messaging/nats"
-	"github.com/ofm-microseervices/ofm-common/pkg/logging"
+	"github.com/ofm-microservices/ofm-common/pkg/logging"
 
 	"go.uber.org/fx"
 )

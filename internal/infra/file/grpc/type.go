@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"gig-service/internal/domain"
-	filev1 "github.com/ofm-microseervices/ofm-common/proto/file/v1"
+	filev1 "github.com/ofm-microservices/ofm-common/proto/file/v1"
 )
 
 // FileService exposes the file-service client used by gig-service.

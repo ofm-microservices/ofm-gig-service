@@ -7,7 +7,7 @@ import (
 	eventbroker "gig-service/internal/presentation/event_broker"
 	events "gig-service/internal/presentation/event_broker/nats"
 	grpcserver "gig-service/internal/presentation/grpc"
-	"github.com/ofm-microseervices/ofm-common/pkg/logging"
+	"github.com/ofm-microservices/ofm-common/pkg/logging"
 
 	"go.uber.org/fx"
 )

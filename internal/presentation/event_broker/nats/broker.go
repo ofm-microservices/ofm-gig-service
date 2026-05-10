@@ -4,7 +4,7 @@ import (
 	"context"
 	"gig-service/config"
 	eventbroker "gig-service/internal/presentation/event_broker"
-	"github.com/ofm-microseervices/ofm-common/pkg/logging"
+	"github.com/ofm-microservices/ofm-common/pkg/logging"
 	"time"
 
 	"github.com/nats-io/nats.go"

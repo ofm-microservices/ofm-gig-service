@@ -4,8 +4,8 @@ import (
 	"errors"
 	"gig-service/internal/domain"
 
-	"github.com/ofm-microseervices/ofm-common/pkg/logging"
-	filev1 "github.com/ofm-microseervices/ofm-common/proto/file/v1"
+	"github.com/ofm-microservices/ofm-common/pkg/logging"
+	filev1 "github.com/ofm-microservices/ofm-common/proto/file/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
