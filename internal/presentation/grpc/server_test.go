@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"gig-service/internal/domain"
 	"gig-service/config"
+	"gig-service/internal/domain"
 	"github.com/ofm-microservices/ofm-common/pkg/logging"
 	gigv1 "github.com/ofm-microservices/ofm-common/proto/gig/v1"
 	. "github.com/onsi/ginkgo/v2"
@@ -45,9 +45,9 @@ var _ = Describe("gig gRPC mapper", func() {
 			PublishedAt:           &when,
 			CreatedAt:             when,
 			UpdatedAt:             when,
-			Packages: []domain.GigPackage{{ID: "pkg-1", GigID: "gig-1", Tier: domain.TierBasic, Description: "basic", DeliveryDays: 1, PriceCents: 100, SortOrder: 1}},
-			Questions: []domain.GigQuestion{{ID: "q-1", GigID: "gig-1", Content: "question", SortOrder: 1}},
-			Media: []domain.GigMedia{{GigID: "gig-1", FileID: "file-1", SortOrder: 1}},
+			Packages:              []domain.GigPackage{{ID: "pkg-1", GigID: "gig-1", Tier: domain.TierBasic, Description: "basic", DeliveryDays: 1, PriceCents: 100, SortOrder: 1}},
+			Questions:             []domain.GigQuestion{{ID: "q-1", GigID: "gig-1", Content: "question", SortOrder: 1}},
+			Media:                 []domain.GigMedia{{GigID: "gig-1", FileID: "file-1", SortOrder: 1}},
 		})
 
 		Expect(resp.GigId).To(Equal("gig-1"))

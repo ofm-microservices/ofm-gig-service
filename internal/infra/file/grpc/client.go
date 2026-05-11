@@ -8,6 +8,7 @@ import (
 	"github.com/ofm-microservices/ofm-common/pkg/logging"
 	"github.com/ofm-microservices/ofm-common/pkg/observability/metrics"
 	filev1 "github.com/ofm-microservices/ofm-common/proto/file/v1"
+	otelgrpc "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	grpcpkg "google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -29,7 +30,12 @@ func NewFileService(cfg config.FileServiceConfig, log logging.Logger) (FileServi
 		return nil, ErrNilLogger
 	}
 
-	conn, err := grpcpkg.NewClient(cfg.Address, grpcpkg.WithTransportCredentials(insecure.NewCredentials()), grpcpkg.WithUnaryInterceptor(metrics.UnaryClientInterceptor()))
+	conn, err := grpcpkg.NewClient(
+		cfg.Address,
+		grpcpkg.WithTransportCredentials(insecure.NewCredentials()),
+		grpcpkg.WithStatsHandler(otelgrpc.NewClientHandler()),
+		grpcpkg.WithUnaryInterceptor(metrics.UnaryClientInterceptor()),
+	)
 	if err != nil {
 		return nil, err
 	}

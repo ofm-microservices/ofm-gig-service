@@ -7,6 +7,7 @@ import (
 	"gig-service/internal/domain"
 	"time"
 
+	"github.com/ofm-microservices/ofm-common/pkg/logging"
 	"github.com/ofm-microservices/ofm-common/pkg/observability/metrics"
 	"github.com/redis/go-redis/v9"
 )
@@ -14,18 +15,22 @@ import (
 type repo struct {
 	rdb  *redis.Client
 	mapr app.GigEventMapper
+	log  logging.Logger
 }
 
 // New constructs the Redis-backed gig read-model repository.
-func New(rdb *redis.Client, mapr app.GigEventMapper) (domain.GigReadRepository, error) {
+func New(rdb *redis.Client, mapr app.GigEventMapper, log logging.Logger) (domain.GigReadRepository, error) {
 	if rdb == nil {
 		return nil, ErrNilRedisClient
 	}
 	if mapr == nil {
 		return nil, ErrNilGig
 	}
+	if log == nil {
+		return nil, ErrNilLogger
+	}
 
-	return &repo{rdb: rdb, mapr: mapr}, nil
+	return &repo{rdb: rdb, mapr: mapr, log: log.With(logging.String("module", "redis-repository"))}, nil
 }
 
 // Upsert stores the gig read model in Redis.
@@ -36,18 +41,42 @@ func (r *repo) Upsert(ctx context.Context, gig *domain.Gig) error {
 
 	if gig == nil {
 		status = "error"
+		r.log.Error("upsert gig failed",
+			logging.Operation("redis.gig.upsert"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.Err(ErrNilGig),
+		)
 		return ErrNilGig
 	}
 
 	payload, err := r.mapr.ToPublishedPayload(gig)
 	if err != nil {
 		status = "error"
+		r.log.Error("upsert gig failed",
+			logging.Operation("redis.gig.upsert"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", gig.ID),
+			logging.Err(err),
+		)
 		return WrapMarshalGigCacheError(err)
 	}
 
 	key := GigCacheKey(gig.ID)
 	if err := r.rdb.Set(ctx, key, payload, 0).Err(); err != nil {
 		status = "error"
+		r.log.Error("upsert gig failed",
+			logging.Operation("redis.gig.upsert"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", gig.ID),
+			logging.String("cache_key", key),
+			logging.Err(err),
+		)
 		return WrapSetGigCacheError(key, err)
 	}
 
@@ -63,6 +92,15 @@ func (r *repo) DeleteByID(ctx context.Context, gigID string) error {
 	key := GigCacheKey(gigID)
 	if err := r.rdb.Del(ctx, key).Err(); err != nil {
 		status = "error"
+		r.log.Error("delete gig failed",
+			logging.Operation("redis.gig.delete_by_id"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", gigID),
+			logging.String("cache_key", key),
+			logging.Err(err),
+		)
 		return WrapDeleteGigCacheError(key, err)
 	}
 

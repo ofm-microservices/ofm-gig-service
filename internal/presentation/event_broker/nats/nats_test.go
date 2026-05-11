@@ -35,6 +35,10 @@ func (f *fakeNatsConn) Publish(subj string, data []byte) error {
 	return f.pubErr
 }
 
+func (f *fakeNatsConn) PublishMsg(msg *nats.Msg) error {
+	return f.Publish(msg.Subject, msg.Data)
+}
+
 func (f *fakeNatsConn) Subscribe(_ string, cb nats.MsgHandler) (*nats.Subscription, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -46,7 +50,7 @@ func (f *fakeNatsConn) Subscribe(_ string, cb nats.MsgHandler) (*nats.Subscripti
 }
 
 func (f *fakeNatsConn) FlushWithContext(context.Context) error { return f.flushErr }
-func (f *fakeNatsConn) Close()                                  {}
+func (f *fakeNatsConn) Close()                                 {}
 
 type fakeEventBroker struct {
 	cfg     config.PullConsumerConfig
@@ -70,7 +74,7 @@ func (f *fakeEventBroker) Close() {}
 type fakeProjectionWriter struct{ upserts int }
 
 func (w *fakeProjectionWriter) Upsert(context.Context, *domain.Gig) error { w.upserts++; return nil }
-func (w *fakeProjectionWriter) DeleteByID(context.Context, string) error   { return nil }
+func (w *fakeProjectionWriter) DeleteByID(context.Context, string) error  { return nil }
 
 type fakePullRuntime struct{ started bool }
 
@@ -251,15 +255,15 @@ var _ = Describe("nats broker helpers", func() {
 		writer := NewMockProjectionWriter(ctrl)
 		mapper := app.NewGigEventMapper()
 		subscriber, err := NewGigProjectionSubscriber(broker, writer, mapper, config.NATSConfig{
-			GigEventsStream:           "GIG_EVENTS",
-			GigPublishedSubject:       "gig.published",
-			GigProjectionBatchSize:    7,
-			GigProjectionMaxWait:      8 * time.Second,
-			GigProjectionWorkers:      3,
-			GigProjectionDurable:      "durable",
-			GigProjectionQueueSize:    11,
-			GigProjectionAckWait:      12 * time.Second,
-			GigProjectionMaxDeliver:   5,
+			GigEventsStream:              "GIG_EVENTS",
+			GigPublishedSubject:          "gig.published",
+			GigProjectionBatchSize:       7,
+			GigProjectionMaxWait:         8 * time.Second,
+			GigProjectionWorkers:         3,
+			GigProjectionDurable:         "durable",
+			GigProjectionQueueSize:       11,
+			GigProjectionAckWait:         12 * time.Second,
+			GigProjectionMaxDeliver:      5,
 			GigProjectionAdaptiveEnabled: true,
 		}, logger)
 		Expect(err).NotTo(HaveOccurred())

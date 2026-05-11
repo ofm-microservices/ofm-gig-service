@@ -9,7 +9,9 @@ import (
 	"github.com/ofm-microservices/ofm-common/pkg/logging"
 	"github.com/ofm-microservices/ofm-common/pkg/observability/metrics"
 	gigv1 "github.com/ofm-microservices/ofm-common/proto/gig/v1"
+	otelgrpc "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
+	"time"
 )
 
 type server struct {
@@ -31,7 +33,10 @@ func NewServer(svc GigService, cfg config.GRPCConfig, log logging.Logger) (Serve
 		return nil, ErrNilLogger
 	}
 
-	grpcSrv := grpc.NewServer(grpc.UnaryInterceptor(metrics.UnaryServerInterceptor()))
+	grpcSrv := grpc.NewServer(
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
+		grpc.UnaryInterceptor(metrics.UnaryServerInterceptor()),
+	)
 	s := &server{
 		svc:  svc,
 		cfg:  cfg,
@@ -71,8 +76,18 @@ func (s *server) Shutdown(context.Context) error {
 // CreateDraft creates a server-side gig draft for the authenticated
 // freelancer.
 func (s *server) CreateDraft(ctx context.Context, req *gigv1.CreateDraftRequest) (*gigv1.CreateDraftResponse, error) {
+	started := time.Now()
+	log := logging.WithContext(ctx, s.log)
 	gig, err := s.svc.CreateDraft(ctx, req.GetFreelancerId())
 	if err != nil {
+		log.Error("create draft failed",
+			logging.Operation("grpc.gig.create_draft"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("freelancer_id", req.GetFreelancerId()),
+			logging.Err(err),
+		)
 		return nil, s.mapr.ToError(err)
 	}
 
@@ -81,8 +96,19 @@ func (s *server) CreateDraft(ctx context.Context, req *gigv1.CreateDraftRequest)
 
 // UpdateBasicInfo updates the gig's public metadata.
 func (s *server) UpdateBasicInfo(ctx context.Context, req *gigv1.UpdateBasicInfoRequest) (*gigv1.UpdateBasicInfoResponse, error) {
+	started := time.Now()
+	log := logging.WithContext(ctx, s.log)
 	gig, err := s.svc.UpdateBasicInfo(ctx, req.GetGigId(), req.GetFreelancerId(), s.mapr.ToUpdateBasicInfoParams(req))
 	if err != nil {
+		log.Error("update basic info failed",
+			logging.Operation("grpc.gig.update_basic_info"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", req.GetGigId()),
+			logging.String("freelancer_id", req.GetFreelancerId()),
+			logging.Err(err),
+		)
 		return nil, s.mapr.ToError(err)
 	}
 
@@ -91,8 +117,19 @@ func (s *server) UpdateBasicInfo(ctx context.Context, req *gigv1.UpdateBasicInfo
 
 // ReplacePackages replaces all gig package tiers.
 func (s *server) ReplacePackages(ctx context.Context, req *gigv1.ReplacePackagesRequest) (*gigv1.ReplacePackagesResponse, error) {
+	started := time.Now()
+	log := logging.WithContext(ctx, s.log)
 	gig, err := s.svc.ReplacePackages(ctx, req.GetGigId(), req.GetFreelancerId(), s.mapr.ToReplacePackagesParams(req))
 	if err != nil {
+		log.Error("replace packages failed",
+			logging.Operation("grpc.gig.replace_packages"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", req.GetGigId()),
+			logging.String("freelancer_id", req.GetFreelancerId()),
+			logging.Err(err),
+		)
 		return nil, s.mapr.ToError(err)
 	}
 
@@ -101,8 +138,19 @@ func (s *server) ReplacePackages(ctx context.Context, req *gigv1.ReplacePackages
 
 // ReplaceQuestions replaces the gig requirements questions.
 func (s *server) ReplaceQuestions(ctx context.Context, req *gigv1.ReplaceQuestionsRequest) (*gigv1.ReplaceQuestionsResponse, error) {
+	started := time.Now()
+	log := logging.WithContext(ctx, s.log)
 	gig, err := s.svc.ReplaceQuestions(ctx, req.GetGigId(), req.GetFreelancerId(), s.mapr.ToReplaceQuestionsParams(req))
 	if err != nil {
+		log.Error("replace questions failed",
+			logging.Operation("grpc.gig.replace_questions"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", req.GetGigId()),
+			logging.String("freelancer_id", req.GetFreelancerId()),
+			logging.Err(err),
+		)
 		return nil, s.mapr.ToError(err)
 	}
 
@@ -111,8 +159,19 @@ func (s *server) ReplaceQuestions(ctx context.Context, req *gigv1.ReplaceQuestio
 
 // ReplaceMedia replaces the gig media references.
 func (s *server) ReplaceMedia(ctx context.Context, req *gigv1.ReplaceMediaRequest) (*gigv1.ReplaceMediaResponse, error) {
+	started := time.Now()
+	log := logging.WithContext(ctx, s.log)
 	gig, err := s.svc.ReplaceMedia(ctx, req.GetGigId(), req.GetFreelancerId(), s.mapr.ToReplaceMediaParams(req))
 	if err != nil {
+		log.Error("replace media failed",
+			logging.Operation("grpc.gig.replace_media"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", req.GetGigId()),
+			logging.String("freelancer_id", req.GetFreelancerId()),
+			logging.Err(err),
+		)
 		return nil, s.mapr.ToError(err)
 	}
 
@@ -121,8 +180,19 @@ func (s *server) ReplaceMedia(ctx context.Context, req *gigv1.ReplaceMediaReques
 
 // GetDraft returns the current gig draft state.
 func (s *server) GetDraft(ctx context.Context, req *gigv1.GetDraftRequest) (*gigv1.GetDraftResponse, error) {
+	started := time.Now()
+	log := logging.WithContext(ctx, s.log)
 	gig, err := s.svc.GetByID(ctx, req.GetGigId(), req.GetFreelancerId())
 	if err != nil {
+		log.Error("get draft failed",
+			logging.Operation("grpc.gig.get_draft"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", req.GetGigId()),
+			logging.String("freelancer_id", req.GetFreelancerId()),
+			logging.Err(err),
+		)
 		return nil, s.mapr.ToError(err)
 	}
 
@@ -131,8 +201,19 @@ func (s *server) GetDraft(ctx context.Context, req *gigv1.GetDraftRequest) (*gig
 
 // Publish makes the gig visible and emits the published event.
 func (s *server) Publish(ctx context.Context, req *gigv1.PublishRequest) (*gigv1.PublishResponse, error) {
+	started := time.Now()
+	log := logging.WithContext(ctx, s.log)
 	gig, err := s.svc.Publish(ctx, req.GetGigId(), req.GetFreelancerId())
 	if err != nil {
+		log.Error("publish failed",
+			logging.Operation("grpc.gig.publish"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", req.GetGigId()),
+			logging.String("freelancer_id", req.GetFreelancerId()),
+			logging.Err(err),
+		)
 		return nil, s.mapr.ToError(err)
 	}
 

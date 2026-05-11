@@ -10,24 +10,29 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+	"github.com/ofm-microservices/ofm-common/pkg/logging"
 	"github.com/ofm-microservices/ofm-common/pkg/observability/metrics"
 )
 
 type repo struct {
 	db         *sqlx.DB
 	translator DBErrorTranslator
+	log        logging.Logger
 }
 
 // New constructs the Yugabyte-backed gig repository.
-func New(db *sqlx.DB, translator DBErrorTranslator) (domain.GigRepository, error) {
+func New(db *sqlx.DB, translator DBErrorTranslator, log logging.Logger) (domain.GigRepository, error) {
 	if db == nil {
 		return nil, ErrNilYugaByteDB
 	}
 	if translator == nil {
 		return nil, ErrNilDBErrorTranslator
 	}
+	if log == nil {
+		return nil, ErrNilLogger
+	}
 
-	return &repo{db: db, translator: translator}, nil
+	return &repo{db: db, translator: translator, log: log.With(logging.String("module", "yugabyte-repository"))}, nil
 }
 
 func (r *repo) CreateDraft(ctx context.Context, params domain.CreateDraftParams) (*domain.Gig, error) {
@@ -66,6 +71,14 @@ func (r *repo) CreateDraft(ctx context.Context, params domain.CreateDraftParams)
 		&row.UpdatedAt,
 	); err != nil {
 		status = "error"
+		r.log.Error("create draft failed",
+			logging.Operation("db.gig.create_draft"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("freelancer_id", params.FreelancerID),
+			logging.Err(err),
+		)
 		return nil, r.translator.TranslateCreateGigError(err)
 	}
 
@@ -103,6 +116,15 @@ func (r *repo) UpdateBasicInfo(ctx context.Context, gigID string, params domain.
 		&row.UpdatedAt,
 	); err != nil {
 		status = "error"
+		r.log.Error("update basic info failed",
+			logging.Operation("db.gig.update_basic_info"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", gigID),
+			logging.String("slug", params.Slug),
+			logging.Err(err),
+		)
 		return nil, r.translator.TranslateFindGigError(err)
 	}
 
@@ -124,6 +146,14 @@ func (r *repo) ReplacePackages(ctx context.Context, gigID string, params domain.
 	if err != nil {
 		status = "error"
 		metrics.Global().IncDBTransaction("yugabyte", "error")
+		r.log.Error("replace packages failed",
+			logging.Operation("db.gig.replace_packages"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", gigID),
+			logging.Err(err),
+		)
 		return nil, r.translator.TranslatePublishGigError(err)
 	}
 	metrics.Global().IncDBTransaction("yugabyte", "started")
@@ -131,6 +161,14 @@ func (r *repo) ReplacePackages(ctx context.Context, gigID string, params domain.
 
 	if _, err := tx.ExecContext(ctx, deleteGigPackagesQuery, gigID); err != nil {
 		status = "error"
+		r.log.Error("replace packages failed",
+			logging.Operation("db.gig.replace_packages"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", gigID),
+			logging.Err(err),
+		)
 		return nil, r.translator.TranslatePublishGigError(err)
 	}
 	for i, pkg := range params.Packages {
@@ -145,16 +183,41 @@ func (r *repo) ReplacePackages(ctx context.Context, gigID string, params domain.
 		}
 		if _, err := tx.ExecContext(ctx, insertGigPackageQuery, row.ID, row.GigID, row.Tier, row.Description, row.DeliveryDays, row.PriceCents, row.SortOrder); err != nil {
 			status = "error"
+			r.log.Error("replace packages failed",
+				logging.Operation("db.gig.replace_packages"),
+				logging.Attempt(1),
+				logging.Retryable(false),
+				logging.DurationMS(time.Since(started)),
+				logging.String("gig_id", gigID),
+				logging.String("tier", string(row.Tier)),
+				logging.Err(err),
+			)
 			return nil, r.translator.TranslatePublishGigError(err)
 		}
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE gigs SET packages_completed = TRUE, updated_at = NOW() WHERE gig_id = $1`, gigID); err != nil {
 		status = "error"
+		r.log.Error("replace packages failed",
+			logging.Operation("db.gig.replace_packages"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", gigID),
+			logging.Err(err),
+		)
 		return nil, r.translator.TranslatePublishGigError(err)
 	}
 	if err := tx.Commit(); err != nil {
 		status = "error"
 		metrics.Global().IncDBTransaction("yugabyte", "error")
+		r.log.Error("replace packages failed",
+			logging.Operation("db.gig.replace_packages"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", gigID),
+			logging.Err(err),
+		)
 		return nil, r.translator.TranslatePublishGigError(err)
 	}
 	metrics.Global().IncDBTransaction("yugabyte", "success")
@@ -177,6 +240,14 @@ func (r *repo) ReplaceQuestions(ctx context.Context, gigID string, params domain
 	if err != nil {
 		status = "error"
 		metrics.Global().IncDBTransaction("yugabyte", "error")
+		r.log.Error("replace questions failed",
+			logging.Operation("db.gig.replace_questions"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", gigID),
+			logging.Err(err),
+		)
 		return nil, r.translator.TranslatePublishGigError(err)
 	}
 	metrics.Global().IncDBTransaction("yugabyte", "started")
@@ -184,6 +255,14 @@ func (r *repo) ReplaceQuestions(ctx context.Context, gigID string, params domain
 
 	if _, err := tx.ExecContext(ctx, deleteGigQuestionsQuery, gigID); err != nil {
 		status = "error"
+		r.log.Error("replace questions failed",
+			logging.Operation("db.gig.replace_questions"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", gigID),
+			logging.Err(err),
+		)
 		return nil, r.translator.TranslatePublishGigError(err)
 	}
 	for i, q := range params.Questions {
@@ -195,16 +274,40 @@ func (r *repo) ReplaceQuestions(ctx context.Context, gigID string, params domain
 		}
 		if _, err := tx.ExecContext(ctx, insertGigQuestionQuery, row.ID, row.GigID, row.Content, row.SortOrder); err != nil {
 			status = "error"
+			r.log.Error("replace questions failed",
+				logging.Operation("db.gig.replace_questions"),
+				logging.Attempt(1),
+				logging.Retryable(false),
+				logging.DurationMS(time.Since(started)),
+				logging.String("gig_id", gigID),
+				logging.Err(err),
+			)
 			return nil, r.translator.TranslatePublishGigError(err)
 		}
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE gigs SET requirements_completed = TRUE, updated_at = NOW() WHERE gig_id = $1`, gigID); err != nil {
 		status = "error"
+		r.log.Error("replace questions failed",
+			logging.Operation("db.gig.replace_questions"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", gigID),
+			logging.Err(err),
+		)
 		return nil, r.translator.TranslatePublishGigError(err)
 	}
 	if err := tx.Commit(); err != nil {
 		status = "error"
 		metrics.Global().IncDBTransaction("yugabyte", "error")
+		r.log.Error("replace questions failed",
+			logging.Operation("db.gig.replace_questions"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", gigID),
+			logging.Err(err),
+		)
 		return nil, r.translator.TranslatePublishGigError(err)
 	}
 	metrics.Global().IncDBTransaction("yugabyte", "success")
@@ -227,6 +330,15 @@ func (r *repo) ReplaceMedia(ctx context.Context, gigID string, params domain.Rep
 	if err != nil {
 		status = "error"
 		metrics.Global().IncDBTransaction("yugabyte", "error")
+		r.log.Error("replace media failed",
+			logging.Operation("db.gig.replace_media"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", gigID),
+			logging.String("picture_file_id", params.PictureFileID),
+			logging.Err(err),
+		)
 		return nil, r.translator.TranslatePublishGigError(err)
 	}
 	metrics.Global().IncDBTransaction("yugabyte", "started")
@@ -234,6 +346,15 @@ func (r *repo) ReplaceMedia(ctx context.Context, gigID string, params domain.Rep
 
 	if _, err := tx.ExecContext(ctx, deleteGigMediaQuery, gigID); err != nil {
 		status = "error"
+		r.log.Error("replace media failed",
+			logging.Operation("db.gig.replace_media"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", gigID),
+			logging.String("picture_file_id", params.PictureFileID),
+			logging.Err(err),
+		)
 		return nil, r.translator.TranslatePublishGigError(err)
 	}
 	for i, m := range params.Media {
@@ -245,16 +366,43 @@ func (r *repo) ReplaceMedia(ctx context.Context, gigID string, params domain.Rep
 		}
 		if _, err := tx.ExecContext(ctx, insertGigMediaQuery, row.ID, row.GigID, row.FileID, row.SortOrder); err != nil {
 			status = "error"
+			r.log.Error("replace media failed",
+				logging.Operation("db.gig.replace_media"),
+				logging.Attempt(1),
+				logging.Retryable(false),
+				logging.DurationMS(time.Since(started)),
+				logging.String("gig_id", gigID),
+				logging.String("file_id", row.FileID),
+				logging.Err(err),
+			)
 			return nil, r.translator.TranslatePublishGigError(err)
 		}
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE gigs SET picture_file_id = $2, media_completed = TRUE, updated_at = NOW() WHERE gig_id = $1`, gigID, params.PictureFileID); err != nil {
 		status = "error"
+		r.log.Error("replace media failed",
+			logging.Operation("db.gig.replace_media"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", gigID),
+			logging.String("picture_file_id", params.PictureFileID),
+			logging.Err(err),
+		)
 		return nil, r.translator.TranslatePublishGigError(err)
 	}
 	if err := tx.Commit(); err != nil {
 		status = "error"
 		metrics.Global().IncDBTransaction("yugabyte", "error")
+		r.log.Error("replace media failed",
+			logging.Operation("db.gig.replace_media"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", gigID),
+			logging.String("picture_file_id", params.PictureFileID),
+			logging.Err(err),
+		)
 		return nil, r.translator.TranslatePublishGigError(err)
 	}
 	metrics.Global().IncDBTransaction("yugabyte", "success")
@@ -277,6 +425,14 @@ func (r *repo) GetByID(ctx context.Context, gigID string) (*domain.Gig, error) {
 		if err == sql.ErrNoRows {
 			return nil, domain.ErrGigNotFound
 		}
+		r.log.Error("get by id failed",
+			logging.Operation("db.gig.get_by_id"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", gigID),
+			logging.Err(err),
+		)
 		return nil, r.translator.TranslateFindGigError(err)
 	}
 
@@ -312,6 +468,14 @@ func (r *repo) Publish(ctx context.Context, gigID string) (*domain.Gig, error) {
 		&row.UpdatedAt,
 	); err != nil {
 		status = "error"
+		r.log.Error("publish failed",
+			logging.Operation("db.gig.publish"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", gigID),
+			logging.Err(err),
+		)
 		return nil, r.translator.TranslatePublishGigError(err)
 	}
 

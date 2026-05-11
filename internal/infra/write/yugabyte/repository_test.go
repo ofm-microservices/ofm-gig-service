@@ -11,11 +11,12 @@ import (
 	"gig-service/internal/domain"
 	"gig-service/internal/infra/write/yugabyte/mapper"
 	"gig-service/internal/infra/write/yugabyte/model"
-	"github.com/google/uuid"
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/jmoiron/sqlx"
+	"github.com/google/uuid"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jmoiron/sqlx"
+	"github.com/ofm-microservices/ofm-common/pkg/logging"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -33,20 +34,23 @@ func (uuidV7Arg) Match(v driver.Value) bool {
 
 var _ = Describe("yugabyte repository", func() {
 	var (
-		db   *sql.DB
-		mock sqlmock.Sqlmock
-		sqlxDB *sqlx.DB
-		repoSvc domain.GigRepository
+		db       *sql.DB
+		mock     sqlmock.Sqlmock
+		sqlxDB   *sqlx.DB
+		repoSvc  domain.GigRepository
 		repoImpl *repo
-		now  = time.Date(2026, time.May, 10, 15, 0, 0, 0, time.UTC)
+		lg       logging.Logger
+		now      = time.Date(2026, time.May, 10, 15, 0, 0, 0, time.UTC)
 	)
 
 	BeforeEach(func() {
 		var err error
+		lg, err = logging.New("gig-service", "test", "debug")
+		Expect(err).NotTo(HaveOccurred())
 		db, mock, err = sqlmock.New()
 		Expect(err).NotTo(HaveOccurred())
 		sqlxDB = sqlx.NewDb(db, "sqlmock")
-		repoSvc, err = New(sqlxDB, NewPgErrorTranslator())
+		repoSvc, err = New(sqlxDB, NewPgErrorTranslator(), lg)
 		Expect(err).NotTo(HaveOccurred())
 		repoImpl = repoSvc.(*repo)
 	})
@@ -56,13 +60,17 @@ var _ = Describe("yugabyte repository", func() {
 	})
 
 	It("validates constructor dependencies", func() {
-		repo, err := New(nil, NewPgErrorTranslator())
+		repo, err := New(nil, NewPgErrorTranslator(), lg)
 		Expect(repo).To(BeNil())
 		Expect(err).To(MatchError(ErrNilYugaByteDB))
 
-		repo, err = New(sqlxDB, nil)
+		repo, err = New(sqlxDB, nil, lg)
 		Expect(repo).To(BeNil())
 		Expect(err).To(MatchError(ErrNilDBErrorTranslator))
+
+		repo, err = New(sqlxDB, NewPgErrorTranslator(), nil)
+		Expect(repo).To(BeNil())
+		Expect(err).To(MatchError(ErrNilLogger))
 	})
 
 	It("creates a draft and loads the aggregate", func() {
@@ -218,8 +226,8 @@ var _ = Describe("yugabyte repository", func() {
 	It("translates additional database error variants", func() {
 		trans := NewPgErrorTranslator()
 		Expect(trans.TranslateCreateGigError(&pgconn.PgError{Code: pgerrcode.UniqueViolation, ConstraintName: GigsPrimaryKeyConstraint})).To(MatchError(domain.ErrGigAlreadyExists))
-		Expect(trans.TranslateCreateGigError(errors.New("SQLSTATE "+pgerrcode.UniqueViolation))).To(MatchError(domain.ErrGigAlreadyExists))
-		Expect(trans.TranslateCreateGigError(errors.New("SQLSTATE "+pgerrcode.InvalidTextRepresentation))).To(MatchError(domain.ErrInvalidGigID))
+		Expect(trans.TranslateCreateGigError(errors.New("SQLSTATE " + pgerrcode.UniqueViolation))).To(MatchError(domain.ErrGigAlreadyExists))
+		Expect(trans.TranslateCreateGigError(errors.New("SQLSTATE " + pgerrcode.InvalidTextRepresentation))).To(MatchError(domain.ErrInvalidGigID))
 		Expect(trans.TranslateFindGigError(errors.New("boom"))).To(MatchError(ContainSubstring("find gig")))
 		Expect(trans.TranslatePublishGigError(errors.New("boom"))).To(MatchError(ContainSubstring("publish gig")))
 	})

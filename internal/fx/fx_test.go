@@ -310,11 +310,11 @@ var _ = Describe("fx providers and invokes", func() {
 	})
 
 	It("wires the service and repository providers", func() {
-		repo, err := ProvideWriteRepo(nil, nil)
+		repo, err := ProvideWriteRepo(nil, nil, lg)
 		Expect(repo).To(BeNil())
 		Expect(err).To(HaveOccurred())
 
-		readRepo, err := ProvideReadRepo(nil, nil)
+		readRepo, err := ProvideReadRepo(nil, nil, lg)
 		Expect(readRepo).To(BeNil())
 		Expect(err).To(HaveOccurred())
 

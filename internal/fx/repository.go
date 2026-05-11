@@ -8,6 +8,7 @@ import (
 	events "gig-service/internal/presentation/event_broker/nats"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/ofm-microservices/ofm-common/pkg/logging"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/fx"
 )
@@ -22,11 +23,11 @@ var RepoModule = fx.Options(
 )
 
 // ProvideWriteRepo constructs the Yugabyte-backed gig repository.
-func ProvideWriteRepo(dbx *sqlx.DB, translator writerepo.DBErrorTranslator) (domain.GigRepository, error) {
-	return writerepo.New(dbx, translator)
+func ProvideWriteRepo(dbx *sqlx.DB, translator writerepo.DBErrorTranslator, lg logging.Logger) (domain.GigRepository, error) {
+	return writerepo.New(dbx, translator, lg)
 }
 
 // ProvideReadRepo constructs the Redis-backed gig read-model writer.
-func ProvideReadRepo(rdb *redis.Client, mapr app.GigEventMapper) (events.ProjectionWriter, error) {
-	return readrepo.New(rdb, mapr)
+func ProvideReadRepo(rdb *redis.Client, mapr app.GigEventMapper, lg logging.Logger) (events.ProjectionWriter, error) {
+	return readrepo.New(rdb, mapr, lg)
 }

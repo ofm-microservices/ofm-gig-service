@@ -67,7 +67,12 @@ func (m *fileMapper) ToError(err error) error {
 		if errors.Is(err, domain.ErrInvalidMediaUpload) || errors.Is(err, domain.ErrInvalidFileID) {
 			return err
 		}
-		m.log.Error("file-service request failed", logging.Err(err))
+		m.log.Error("file-service request failed",
+			logging.Operation("grpc.file.map_error"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.Err(err),
+		)
 		return err
 	}
 }
