@@ -20,9 +20,24 @@ type FileService interface {
 	DeleteFile(ctx context.Context, fileID string) error
 }
 
+// ConnectStatusChecker queries payment-service for a freelancer's Stripe
+// Connect onboarding status.
+type ConnectStatusChecker interface {
+	GetConnectStatus(ctx context.Context, userID string) (*ConnectStatusResult, error)
+}
+
 // Slugger turns human-readable titles into URL-safe slugs for gig storage.
 type Slugger interface {
 	Generate(title string) string
+}
+
+// ConnectStatusResult carries the normalized Connect onboarding state.
+type ConnectStatusResult struct {
+	UserID          string
+	Status          string
+	StripeAccountID string
+	DisabledReason  string
+	OccurredAt      string
 }
 
 // GigService owns gig draft creation, draft updates, and publication.

@@ -3,9 +3,16 @@ package service
 import "errors"
 
 var (
+	// ErrNilGigRepository reports that the gig repository dependency was not provided.
 	ErrNilGigRepository = errors.New("gig repository is nil")
-	ErrNilFileService   = errors.New("file service is nil")
-	ErrNilEventBroker   = errors.New("event broker is nil")
-	ErrNilSlugger       = errors.New("slugger is nil")
-	ErrNilLogger        = errors.New("logger is nil")
+	// ErrNilFileService reports that the file-service dependency was not provided.
+	ErrNilFileService = errors.New("file service is nil")
+	// ErrNilConnectStatusChecker reports that the payment-service Connect lookup dependency was not provided.
+	ErrNilConnectStatusChecker = errors.New("connect status checker is nil")
+	// ErrNilEventBroker reports that the event broker dependency was not provided.
+	ErrNilEventBroker = errors.New("event broker is nil")
+	// ErrNilSlugger reports that the slugger dependency was not provided.
+	ErrNilSlugger = errors.New("slugger is nil")
+	// ErrNilLogger reports that the logger dependency was not provided.
+	ErrNilLogger = errors.New("logger is nil")
 )

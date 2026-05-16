@@ -7,14 +7,15 @@ import (
 
 // Config groups the full gig-service runtime configuration.
 type Config struct {
-	App         AppConfig
-	DB          DBConfig
-	GRPC        GRPCConfig
-	Metrics     MetricsConfig
-	Tracing     TracingConfig
-	Redis       RedisConfig
-	NATS        NATSConfig
-	FileService FileServiceConfig
+	App            AppConfig
+	DB             DBConfig
+	GRPC           GRPCConfig
+	Metrics        MetricsConfig
+	Tracing        TracingConfig
+	Redis          RedisConfig
+	NATS           NATSConfig
+	FileService    FileServiceConfig
+	PaymentService PaymentServiceConfig
 }
 
 // Load reads environment variables into Config and applies defaults.

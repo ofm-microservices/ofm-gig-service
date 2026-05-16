@@ -108,6 +108,45 @@ func (mr *MockFileServiceMockRecorder) UploadFiles(ctx, ownerID, prefix, files a
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UploadFiles", reflect.TypeOf((*MockFileService)(nil).UploadFiles), ctx, ownerID, prefix, files)
 }
 
+// MockConnectStatusChecker is a mock of ConnectStatusChecker interface.
+type MockConnectStatusChecker struct {
+	ctrl     *gomock.Controller
+	recorder *MockConnectStatusCheckerMockRecorder
+	isgomock struct{}
+}
+
+// MockConnectStatusCheckerMockRecorder is the mock recorder for MockConnectStatusChecker.
+type MockConnectStatusCheckerMockRecorder struct {
+	mock *MockConnectStatusChecker
+}
+
+// NewMockConnectStatusChecker creates a new mock instance.
+func NewMockConnectStatusChecker(ctrl *gomock.Controller) *MockConnectStatusChecker {
+	mock := &MockConnectStatusChecker{ctrl: ctrl}
+	mock.recorder = &MockConnectStatusCheckerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockConnectStatusChecker) EXPECT() *MockConnectStatusCheckerMockRecorder {
+	return m.recorder
+}
+
+// GetConnectStatus mocks base method.
+func (m *MockConnectStatusChecker) GetConnectStatus(ctx context.Context, userID string) (*ConnectStatusResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetConnectStatus", ctx, userID)
+	ret0, _ := ret[0].(*ConnectStatusResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetConnectStatus indicates an expected call of GetConnectStatus.
+func (mr *MockConnectStatusCheckerMockRecorder) GetConnectStatus(ctx, userID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectStatus", reflect.TypeOf((*MockConnectStatusChecker)(nil).GetConnectStatus), ctx, userID)
+}
+
 // MockSlugger is a mock of Slugger interface.
 type MockSlugger struct {
 	ctrl     *gomock.Controller

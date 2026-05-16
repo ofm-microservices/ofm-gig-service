@@ -12,6 +12,7 @@ var Module = fx.Options(
 	StorageModule,
 	MessagingModule,
 	FileClientModule,
+	PaymentClientModule,
 	RepoModule,
 	ServiceModule,
 	PresentationModule,

@@ -19,6 +19,7 @@ var (
 	ErrInvalidMediaRef             = ErrInvalidFileID
 	ErrInvalidPackageCount         = errors.New("invalid package count")
 	ErrInvalidGigState             = errors.New("invalid gig state")
+	ErrConnectOnboardingIncomplete = errors.New("connect onboarding incomplete")
 	ErrGigNotFound                 = errors.New("gig not found")
 	ErrGigAlreadyExists            = errors.New("gig already exists")
 	ErrGigDraftIncomplete          = errors.New("gig draft is incomplete")
