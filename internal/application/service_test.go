@@ -24,6 +24,7 @@ var _ = Describe("gigService", func() {
 		ctrl    *gomock.Controller
 		repo    *MockGigRepository
 		files   *MockFileService
+		connect *MockConnectStatusChecker
 		broker  *MockEventBroker
 		slugger *MockSlugger
 		logger  logging.Logger
@@ -35,6 +36,7 @@ var _ = Describe("gigService", func() {
 		ctrl = gomock.NewController(GinkgoT())
 		repo = NewMockGigRepository(ctrl)
 		files = NewMockFileService(ctrl)
+		connect = NewMockConnectStatusChecker(ctrl)
 		broker = NewMockEventBroker(ctrl)
 		slugger = NewMockSlugger(ctrl)
 
@@ -42,7 +44,7 @@ var _ = Describe("gigService", func() {
 		logger, err = logging.New("gig-service", "test", "debug")
 		Expect(err).NotTo(HaveOccurred())
 
-		svc, err = New(repo, files, broker, slugger, logger)
+		svc, err = New(repo, files, connect, broker, slugger, logger)
 		Expect(err).NotTo(HaveOccurred())
 		ctx = context.Background()
 	})
@@ -53,23 +55,27 @@ var _ = Describe("gigService", func() {
 
 	Describe("New", func() {
 		It("validates nil dependencies", func() {
-			created, err := New(nil, files, broker, slugger, logger)
+			created, err := New(nil, files, connect, broker, slugger, logger)
 			Expect(created).To(BeNil())
 			Expect(err).To(MatchError(ErrNilGigRepository))
 
-			created, err = New(repo, nil, broker, slugger, logger)
+			created, err = New(repo, nil, connect, broker, slugger, logger)
 			Expect(created).To(BeNil())
 			Expect(err).To(MatchError(ErrNilFileService))
 
-			created, err = New(repo, files, nil, slugger, logger)
+			created, err = New(repo, files, nil, broker, slugger, logger)
+			Expect(created).To(BeNil())
+			Expect(err).To(MatchError(ErrNilConnectStatusChecker))
+
+			created, err = New(repo, files, connect, nil, slugger, logger)
 			Expect(created).To(BeNil())
 			Expect(err).To(MatchError(ErrNilEventBroker))
 
-			created, err = New(repo, files, broker, nil, logger)
+			created, err = New(repo, files, connect, broker, nil, logger)
 			Expect(created).To(BeNil())
 			Expect(err).To(MatchError(ErrNilSlugger))
 
-			created, err = New(repo, files, broker, slugger, nil)
+			created, err = New(repo, files, connect, broker, slugger, nil)
 			Expect(created).To(BeNil())
 			Expect(err).To(MatchError(ErrNilLogger))
 		})
@@ -344,6 +350,27 @@ var _ = Describe("gigService", func() {
 			Expect(err).To(MatchError(domain.ErrGigAlreadyPublished))
 		})
 
+		It("rejects publish when connect onboarding is incomplete", func() {
+			connect.EXPECT().GetConnectStatus(gomock.Any(), "freelancer-1").
+				Return(&ConnectStatusResult{UserID: "freelancer-1", Status: "pending"}, nil)
+			repo.EXPECT().GetByID(gomock.Any(), "gig-1").Return(&domain.Gig{
+				ID:                    "gig-1",
+				FreelancerID:          "freelancer-1",
+				Status:                domain.StatusDraft,
+				BasicInfoCompleted:    true,
+				PackagesCompleted:     true,
+				RequirementsCompleted: true,
+				MediaCompleted:        true,
+				Packages: []domain.GigPackage{
+					{Tier: domain.TierBasic, Description: "basic", DeliveryDays: 1, PriceCents: 1},
+				},
+			}, nil)
+
+			result, err := svc.Publish(ctx, "gig-1", "freelancer-1")
+			Expect(result).To(BeNil())
+			Expect(err).To(MatchError(domain.ErrConnectOnboardingIncomplete))
+		})
+
 		It("publishes the gig and emits the event", func() {
 			gig := &domain.Gig{
 				ID:                    "gig-1",
@@ -371,6 +398,8 @@ var _ = Describe("gigService", func() {
 			}
 
 			repo.EXPECT().GetByID(gomock.Any(), "gig-1").Return(gig, nil)
+			connect.EXPECT().GetConnectStatus(gomock.Any(), "freelancer-1").
+				Return(&ConnectStatusResult{UserID: "freelancer-1", Status: "completed"}, nil)
 			repo.EXPECT().Publish(gomock.Any(), "gig-1").Return(gig, nil)
 			broker.EXPECT().Publish(gomock.Any(), gigPublishedSubject, gomock.AssignableToTypeOf([]byte{})).
 				DoAndReturn(func(_ context.Context, subject string, payload []byte) error {
@@ -407,6 +436,8 @@ var _ = Describe("gigService", func() {
 			}
 
 			repo.EXPECT().GetByID(gomock.Any(), "gig-1").Return(gig, nil)
+			connect.EXPECT().GetConnectStatus(gomock.Any(), "freelancer-1").
+				Return(&ConnectStatusResult{UserID: "freelancer-1", Status: "completed"}, nil)
 			repo.EXPECT().Publish(gomock.Any(), "gig-1").Return(gig, nil)
 			broker.EXPECT().Publish(gomock.Any(), gigPublishedSubject, gomock.Any()).Return(errors.New("broker failed"))
 

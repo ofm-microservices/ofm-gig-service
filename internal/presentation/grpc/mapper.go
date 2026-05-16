@@ -180,7 +180,8 @@ func (m *gigMapper) ToError(err error) error {
 		return status.Error(codes.NotFound, "gig not found")
 	case errors.Is(err, domain.ErrGigDraftIncomplete),
 		errors.Is(err, domain.ErrGigAlreadyPublished),
-		errors.Is(err, domain.ErrInvalidGigState):
+		errors.Is(err, domain.ErrInvalidGigState),
+		errors.Is(err, domain.ErrConnectOnboardingIncomplete):
 		return status.Error(codes.FailedPrecondition, err.Error())
 	default:
 		m.log.Error("gig request failed", logging.Err(err))

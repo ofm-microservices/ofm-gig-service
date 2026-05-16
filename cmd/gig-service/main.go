@@ -16,6 +16,7 @@ func newApp() *fx.App {
 		appfx.StorageModule,
 		appfx.MessagingModule,
 		appfx.FileClientModule,
+		appfx.PaymentClientModule,
 		appfx.RepoModule,
 		appfx.ServiceModule,
 		appfx.PresentationModule,

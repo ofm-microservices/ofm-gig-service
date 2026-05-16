@@ -29,6 +29,7 @@ var _ = Describe("Config", func() {
 		GinkgoT().Setenv("REDIS_PORT", "6380")
 		GinkgoT().Setenv("NATS_URL", "nats://127.0.0.1:4222")
 		GinkgoT().Setenv("FILE_SERVICE_ADDRESS", "127.0.0.1:9504")
+		GinkgoT().Setenv("PAYMENT_SERVICE_ADDRESS", "127.0.0.1:9505")
 
 		cfg, err := Load()
 
@@ -55,6 +56,7 @@ var _ = Describe("Config", func() {
 		GinkgoT().Setenv("REDIS_PORT", "6380")
 		GinkgoT().Setenv("NATS_URL", "nats://127.0.0.1:4222")
 		GinkgoT().Setenv("FILE_SERVICE_ADDRESS", "127.0.0.1:9504")
+		GinkgoT().Setenv("PAYMENT_SERVICE_ADDRESS", "127.0.0.1:9505")
 
 		cfg, err := Load()
 

@@ -8,21 +8,25 @@ import (
 )
 
 type gigService struct {
-	repo   domain.GigRepository
-	files  FileService
-	broker EventBroker
-	slug   Slugger
-	mapr   GigEventMapper
-	log    Logger
+	repo    domain.GigRepository
+	files   FileService
+	connect ConnectStatusChecker
+	broker  EventBroker
+	slug    Slugger
+	mapr    GigEventMapper
+	log     Logger
 }
 
 // New constructs the gig application service.
-func New(repo domain.GigRepository, files FileService, broker EventBroker, slugger Slugger, log Logger) (GigService, error) {
+func New(repo domain.GigRepository, files FileService, connect ConnectStatusChecker, broker EventBroker, slugger Slugger, log Logger) (GigService, error) {
 	if repo == nil {
 		return nil, ErrNilGigRepository
 	}
 	if files == nil {
 		return nil, ErrNilFileService
+	}
+	if connect == nil {
+		return nil, ErrNilConnectStatusChecker
 	}
 	if broker == nil {
 		return nil, ErrNilEventBroker
@@ -35,12 +39,13 @@ func New(repo domain.GigRepository, files FileService, broker EventBroker, slugg
 	}
 
 	return &gigService{
-		repo:   repo,
-		files:  files,
-		broker: broker,
-		slug:   slugger,
-		mapr:   NewGigEventMapper(),
-		log:    log.With(logging.String("module", "application")),
+		repo:    repo,
+		files:   files,
+		connect: connect,
+		broker:  broker,
+		slug:    slugger,
+		mapr:    NewGigEventMapper(),
+		log:     log.With(logging.String("module", "application")),
 	}, nil
 }
 
@@ -180,6 +185,14 @@ func (s *gigService) Publish(ctx context.Context, gigID, freelancerID string) (*
 	}
 	if err := validatePublishReady(gig); err != nil {
 		return nil, err
+	}
+	status, err := s.connect.GetConnectStatus(ctx, gig.FreelancerID)
+	if err != nil {
+		s.log.Error("failed to check connect onboarding status", logging.String("freelancer_id", gig.FreelancerID), logging.Err(err))
+		return nil, err
+	}
+	if status == nil || status.Status != "completed" {
+		return nil, domain.ErrConnectOnboardingIncomplete
 	}
 
 	gig, err = s.repo.Publish(ctx, gig.ID)

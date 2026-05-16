@@ -140,6 +140,7 @@ var _ = Describe("fx providers and invokes", func() {
 		GinkgoT().Setenv("REDIS_PORT", "6380")
 		GinkgoT().Setenv("NATS_URL", "nats://127.0.0.1:4222")
 		GinkgoT().Setenv("FILE_SERVICE_ADDRESS", "127.0.0.1:9096")
+		GinkgoT().Setenv("PAYMENT_SERVICE_ADDRESS", "127.0.0.1:9097")
 
 		cfg, err := ProvideConfig()
 		Expect(err).NotTo(HaveOccurred())
@@ -318,7 +319,7 @@ var _ = Describe("fx providers and invokes", func() {
 		Expect(readRepo).To(BeNil())
 		Expect(err).To(HaveOccurred())
 
-		svc, err := ProvideGigService(nil, nil, nil, nil, lg)
+		svc, err := ProvideGigService(nil, nil, nil, nil, nil, lg)
 		Expect(svc).To(BeNil())
 		Expect(err).To(HaveOccurred())
 	})
