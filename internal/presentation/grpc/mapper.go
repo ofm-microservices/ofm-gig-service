@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"errors"
+	service "gig-service/internal/application"
 	"gig-service/internal/domain"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 type GigMapper interface {
 	ToCreateDraftResponse(gig *domain.Gig) *gigv1.CreateDraftResponse
 	ToGigResponse(gig *domain.Gig) *gigv1.Gig
+	ToOrderStartSnapshot(snapshot *service.OrderStartSnapshot) *gigv1.OrderStartSnapshot
 	ToUpdateBasicInfoParams(req *gigv1.UpdateBasicInfoRequest) domain.UpdateBasicInfoParams
 	ToReplacePackagesParams(req *gigv1.ReplacePackagesRequest) domain.ReplacePackagesParams
 	ToReplaceQuestionsParams(req *gigv1.ReplaceQuestionsRequest) domain.ReplaceQuestionsParams
@@ -100,6 +102,37 @@ func (m *gigMapper) ToGigResponse(gig *domain.Gig) *gigv1.Gig {
 		}
 	}
 
+	return resp
+}
+
+func (m *gigMapper) ToOrderStartSnapshot(snapshot *service.OrderStartSnapshot) *gigv1.OrderStartSnapshot {
+	if snapshot == nil {
+		return nil
+	}
+	resp := &gigv1.OrderStartSnapshot{
+		GigId:              snapshot.GigID,
+		PackageId:          snapshot.PackageID,
+		SellerUserId:       snapshot.SellerID,
+		GigTitle:           snapshot.GigTitle,
+		PackageTitle:       snapshot.PackageTitle,
+		PackageDescription: snapshot.PackageDescription,
+		PriceCents:         snapshot.PriceCents,
+		Currency:           snapshot.Currency,
+		DeliveryDays:       snapshot.DeliveryDays,
+		RevisionCount:      snapshot.RevisionCount,
+		GigPublished:       snapshot.GigPublished,
+		PackageAvailable:   snapshot.PackageAvailable,
+	}
+	if len(snapshot.Questions) > 0 {
+		resp.Questions = make([]*gigv1.GigQuestion, 0, len(snapshot.Questions))
+		for _, q := range snapshot.Questions {
+			resp.Questions = append(resp.Questions, &gigv1.GigQuestion{
+				Id:        q.ID,
+				Content:   q.Text,
+				SortOrder: q.SortOrder,
+			})
+		}
+	}
 	return resp
 }
 

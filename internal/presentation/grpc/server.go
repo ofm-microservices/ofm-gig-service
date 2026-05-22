@@ -199,6 +199,27 @@ func (s *server) GetDraft(ctx context.Context, req *gigv1.GetDraftRequest) (*gig
 	return &gigv1.GetDraftResponse{Gig: s.mapr.ToGigResponse(gig)}, nil
 }
 
+// GetOrderStartSnapshot returns the published gig snapshot for the order wizard.
+func (s *server) GetOrderStartSnapshot(ctx context.Context, req *gigv1.GetOrderStartSnapshotRequest) (*gigv1.GetOrderStartSnapshotResponse, error) {
+	started := time.Now()
+	log := logging.WithContext(ctx, s.log)
+	snapshot, err := s.svc.GetOrderStartSnapshot(ctx, req.GetGigId(), req.GetPackageId())
+	if err != nil {
+		log.Error("get order start snapshot failed",
+			logging.Operation("grpc.gig.get_order_start_snapshot"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", req.GetGigId()),
+			logging.String("package_id", req.GetPackageId()),
+			logging.Err(err),
+		)
+		return nil, s.mapr.ToError(err)
+	}
+
+	return &gigv1.GetOrderStartSnapshotResponse{Snapshot: s.mapr.ToOrderStartSnapshot(snapshot)}, nil
+}
+
 // Publish makes the gig visible and emits the published event.
 func (s *server) Publish(ctx context.Context, req *gigv1.PublishRequest) (*gigv1.PublishResponse, error) {
 	started := time.Now()
