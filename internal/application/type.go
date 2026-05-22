@@ -48,5 +48,31 @@ type GigService interface {
 	ReplaceQuestions(ctx context.Context, gigID, freelancerID string, params domain.ReplaceQuestionsParams) (*domain.Gig, error)
 	ReplaceMedia(ctx context.Context, gigID, freelancerID string, params domain.ReplaceMediaUploadParams) (*domain.Gig, error)
 	GetByID(ctx context.Context, gigID, freelancerID string) (*domain.Gig, error)
+	GetOrderStartSnapshot(ctx context.Context, gigID, packageID string) (*OrderStartSnapshot, error)
 	Publish(ctx context.Context, gigID, freelancerID string) (*domain.Gig, error)
+}
+
+// OrderStartSnapshot contains the published gig and package data required by
+// the order saga to create the draft order.
+type OrderStartSnapshot struct {
+	GigID              string
+	PackageID          string
+	SellerID           string
+	GigTitle           string
+	PackageTitle       string
+	PackageDescription string
+	PriceCents         int64
+	Currency           string
+	DeliveryDays       int32
+	RevisionCount      int32
+	GigPublished       bool
+	PackageAvailable   bool
+	Questions          []OrderStartQuestion
+}
+
+// OrderStartQuestion represents one published gig requirement question.
+type OrderStartQuestion struct {
+	ID        string
+	Text      string
+	SortOrder int32
 }

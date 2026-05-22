@@ -11,6 +11,7 @@ package grpc
 
 import (
 	context "context"
+	service "gig-service/internal/application"
 	domain "gig-service/internal/domain"
 	reflect "reflect"
 
@@ -198,6 +199,21 @@ func (m *MockGigService) GetByID(ctx context.Context, gigID, freelancerID string
 func (mr *MockGigServiceMockRecorder) GetByID(ctx, gigID, freelancerID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByID", reflect.TypeOf((*MockGigService)(nil).GetByID), ctx, gigID, freelancerID)
+}
+
+// GetOrderStartSnapshot mocks base method.
+func (m *MockGigService) GetOrderStartSnapshot(ctx context.Context, gigID, packageID string) (*service.OrderStartSnapshot, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetOrderStartSnapshot", ctx, gigID, packageID)
+	ret0, _ := ret[0].(*service.OrderStartSnapshot)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetOrderStartSnapshot indicates an expected call of GetOrderStartSnapshot.
+func (mr *MockGigServiceMockRecorder) GetOrderStartSnapshot(ctx, gigID, packageID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOrderStartSnapshot", reflect.TypeOf((*MockGigService)(nil).GetOrderStartSnapshot), ctx, gigID, packageID)
 }
 
 // Publish mocks base method.

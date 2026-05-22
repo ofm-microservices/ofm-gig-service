@@ -178,6 +178,61 @@ func (s *gigService) GetByID(ctx context.Context, gigID, freelancerID string) (*
 	return gig, nil
 }
 
+func (s *gigService) GetOrderStartSnapshot(ctx context.Context, gigID, packageID string) (*OrderStartSnapshot, error) {
+	gigID = strings.TrimSpace(gigID)
+	packageID = strings.TrimSpace(packageID)
+	if gigID == "" {
+		return nil, domain.ErrInvalidGigID
+	}
+	if packageID == "" {
+		return nil, domain.ErrInvalidPackageTier
+	}
+
+	gig, err := s.repo.GetByID(ctx, gigID)
+	if err != nil {
+		return nil, err
+	}
+	if gig.Status != domain.StatusPublished {
+		return nil, domain.ErrGigDraftIncomplete
+	}
+	var pkg *domain.GigPackage
+	for i := range gig.Packages {
+		if strings.TrimSpace(gig.Packages[i].ID) == packageID {
+			pkg = &gig.Packages[i]
+			break
+		}
+	}
+	if pkg == nil {
+		return nil, domain.ErrInvalidPackageTier
+	}
+
+	snapshot := &OrderStartSnapshot{
+		GigID:            gig.ID,
+		PackageID:        pkg.ID,
+		SellerID:         gig.FreelancerID,
+		GigTitle:         gig.Title,
+		PackageTitle:     pkg.Tier,
+		PackageDescription: pkg.Description,
+		PriceCents:       pkg.PriceCents,
+		Currency:         gig.Currency,
+		DeliveryDays:     pkg.DeliveryDays,
+		RevisionCount:    int32(len(gig.Questions)),
+		GigPublished:     gig.Status == domain.StatusPublished,
+		PackageAvailable: true,
+	}
+	if len(gig.Questions) > 0 {
+		snapshot.Questions = make([]OrderStartQuestion, 0, len(gig.Questions))
+		for _, q := range gig.Questions {
+			snapshot.Questions = append(snapshot.Questions, OrderStartQuestion{
+				ID:        q.ID,
+				Text:      q.Content,
+				SortOrder: q.SortOrder,
+			})
+		}
+	}
+	return snapshot, nil
+}
+
 func (s *gigService) Publish(ctx context.Context, gigID, freelancerID string) (*domain.Gig, error) {
 	gig, err := s.getOwnedGig(ctx, gigID, freelancerID)
 	if err != nil {
