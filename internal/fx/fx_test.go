@@ -90,6 +90,22 @@ func (fakeGigService) ReplaceMedia(context.Context, string, string, domain.Repla
 func (fakeGigService) GetByID(context.Context, string, string) (*domain.Gig, error) {
 	return &domain.Gig{ID: "gig-1"}, nil
 }
+func (fakeGigService) GetOrderStartSnapshot(context.Context, string, string) (*app.OrderStartSnapshot, error) {
+	return &app.OrderStartSnapshot{
+		GigID:              "gig-1",
+		PackageID:          "pkg-1",
+		SellerID:           "seller-1",
+		GigTitle:           "Logo design",
+		PackageTitle:       "Starter",
+		PackageDescription: "Basic gig package",
+		PriceCents:         1000,
+		Currency:           "USD",
+		DeliveryDays:       3,
+		RevisionCount:      1,
+		GigPublished:       true,
+		PackageAvailable:   true,
+	}, nil
+}
 func (fakeGigService) Publish(context.Context, string, string) (*domain.Gig, error) {
 	return &domain.Gig{ID: "gig-1"}, nil
 }
