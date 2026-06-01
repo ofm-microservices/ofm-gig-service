@@ -5,6 +5,8 @@ import "errors"
 var (
 	// ErrNilGigRepository reports that the gig repository dependency was not provided.
 	ErrNilGigRepository = errors.New("gig repository is nil")
+	// ErrNilGigReadRepository reports that the gig read repository dependency was not provided.
+	ErrNilGigReadRepository = errors.New("gig read repository is nil")
 	// ErrNilFileService reports that the file-service dependency was not provided.
 	ErrNilFileService = errors.New("file service is nil")
 	// ErrNilConnectStatusChecker reports that the payment-service Connect lookup dependency was not provided.

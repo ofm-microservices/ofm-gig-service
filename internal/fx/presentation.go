@@ -29,12 +29,13 @@ var PresentationModule = fx.Options(
 // published gig events into Redis.
 func ProvideGigProjectionSubscriber(
 	broker eventbroker.EventBroker,
+	svc app.GigService,
 	writer events.ProjectionWriter,
 	mapr app.GigEventMapper,
 	cfg *config.Config,
 	lg logging.Logger,
 ) (events.GigProjectionSubscriber, error) {
-	return events.NewGigProjectionSubscriber(broker, writer, mapr, cfg.NATS, lg)
+	return events.NewGigProjectionSubscriber(broker, svc, writer, mapr, cfg.NATS, lg)
 }
 
 // ProvideGRPCServer constructs the gRPC draft workflow server exposed by

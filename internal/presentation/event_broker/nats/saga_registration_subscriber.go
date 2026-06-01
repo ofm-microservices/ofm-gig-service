@@ -12,6 +12,7 @@ import (
 
 type gigProjectionSubscriber struct {
 	broker eventbroker.EventBroker
+	svc    app.GigService
 	writer ProjectionWriter
 	cfg    config.NATSConfig
 	mapr   app.GigEventMapper
@@ -22,6 +23,7 @@ type gigProjectionSubscriber struct {
 // events into Redis.
 func NewGigProjectionSubscriber(
 	broker eventbroker.EventBroker,
+	svc app.GigService,
 	writer ProjectionWriter,
 	mapr app.GigEventMapper,
 	cfg config.NATSConfig,
@@ -29,6 +31,9 @@ func NewGigProjectionSubscriber(
 ) (GigProjectionSubscriber, error) {
 	if broker == nil {
 		return nil, ErrNilBroker
+	}
+	if svc == nil {
+		return nil, ErrNilGigService
 	}
 	if writer == nil {
 		return nil, ErrNilProjectionWriter
@@ -39,6 +44,7 @@ func NewGigProjectionSubscriber(
 
 	return &gigProjectionSubscriber{
 		broker: broker,
+		svc:    svc,
 		writer: writer,
 		cfg:    cfg,
 		mapr:   mapr,
@@ -49,7 +55,7 @@ func NewGigProjectionSubscriber(
 // Subscribe starts the pull consumer that projects gig events into Redis.
 func (s *gigProjectionSubscriber) Subscribe(ctx context.Context) error {
 	s.log.Info("registering gig projection pull consumer",
-		logging.String("subject", s.cfg.GigPublishedSubject),
+		logging.String("subject", s.cfg.GigProjectionSubject),
 		logging.String("stream", s.cfg.GigEventsStream),
 		logging.Int("batch_size", s.cfg.GigProjectionBatchSize),
 		logging.Any("max_wait", s.cfg.GigProjectionMaxWait),
@@ -59,14 +65,14 @@ func (s *gigProjectionSubscriber) Subscribe(ctx context.Context) error {
 	return s.broker.RunPullConsumer(
 		ctx,
 		s.buildPullConsumerConfig(),
-		s.handleGigPublishedEvent,
+		s.handleGigProjectionRequestedEvent,
 	)
 }
 
 func (s *gigProjectionSubscriber) buildPullConsumerConfig() config.PullConsumerConfig {
 	return config.PullConsumerConfig{
 		Stream:     s.cfg.GigEventsStream,
-		Subject:    s.cfg.GigPublishedSubject,
+		Subject:    s.cfg.GigProjectionSubject,
 		Durable:    s.cfg.GigProjectionDurable,
 		BatchSize:  s.cfg.GigProjectionBatchSize,
 		MaxWait:    s.cfg.GigProjectionMaxWait,

@@ -49,32 +49,31 @@ var _ = Describe("redis repository", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		gig := &domain.Gig{
-			ID:                    "gig-1",
-			FreelancerID:          "freelancer-1",
-			Slug:                  "gig-1",
-			Title:                 "Gig One",
-			Description:           "desc",
-			CategoryID:            1001,
-			Currency:              "usd",
-			Status:                domain.StatusDraft,
-			BasicInfoCompleted:    true,
-			PackagesCompleted:     true,
-			RequirementsCompleted: true,
-			MediaCompleted:        true,
-			PictureFileID:         "cover-file",
-			Packages:              []domain.GigPackage{{ID: "pkg-1", GigID: "gig-1", Tier: domain.TierBasic, Description: "basic", DeliveryDays: 1, PriceCents: 100, SortOrder: 1}},
-			Questions:             []domain.GigQuestion{{ID: "q-1", GigID: "gig-1", Content: "question", SortOrder: 1}},
-			Media:                 []domain.GigMedia{{GigID: "gig-1", FileID: "file-1", SortOrder: 1}},
+			ID:            "gig-1",
+			FreelancerID:  "freelancer-1",
+			Slug:          "gig-1",
+			Title:         "Gig One",
+			Description:   "desc",
+			CategoryID:    1001,
+			Currency:      "usd",
+			PictureFileID: "cover-file",
+			Packages:      []domain.GigPackage{{ID: "pkg-1", GigID: "gig-1", Tier: domain.TierBasic, Description: "basic", DeliveryDays: 1, PriceCents: 100, SortOrder: 1}},
+			Media:         []domain.GigMedia{{GigID: "gig-1", FileID: "file-1", SortOrder: 1}},
 		}
 
 		Expect(repo.Upsert(context.Background(), gig)).To(Succeed())
 		raw, err := rdb.Get(context.Background(), GigCacheKey("gig-1")).Result()
 		Expect(err).NotTo(HaveOccurred())
 
-		var payload app.GigPublishedEvent
+		var payload app.GigReadModelEvent
 		Expect(json.Unmarshal([]byte(raw), &payload)).To(Succeed())
 		Expect(payload.GigID).To(Equal("gig-1"))
-		Expect(payload.Media[0].FileID).To(Equal("file-1"))
+		Expect(payload.Media[0].ID).To(Equal("file-1"))
+
+		loaded, err := repo.GetByID(context.Background(), "gig-1")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(loaded.ID).To(Equal("gig-1"))
+		Expect(loaded.Media[0].FileID).To(Equal("file-1"))
 
 		Expect(repo.DeleteByID(context.Background(), "gig-1")).To(Succeed())
 		_, err = rdb.Get(context.Background(), GigCacheKey("gig-1")).Result()
@@ -85,7 +84,7 @@ var _ = Describe("redis repository", func() {
 		ctrl := gomock.NewController(GinkgoT())
 		DeferCleanup(ctrl.Finish)
 		mapper := NewMockGigEventMapper(ctrl)
-		mapper.EXPECT().ToPublishedPayload(gomock.Any()).Return(nil, errors.New("marshal failed"))
+		mapper.EXPECT().ToReadModelPayload(gomock.Any()).Return(nil, errors.New("marshal failed"))
 
 		srv, err := miniredis.Run()
 		Expect(err).NotTo(HaveOccurred())
@@ -97,7 +96,11 @@ var _ = Describe("redis repository", func() {
 
 		Expect(repo.Upsert(context.Background(), &domain.Gig{ID: "gig-1"})).To(MatchError(ContainSubstring("marshal gig cache")))
 		Expect(repo.Upsert(context.Background(), nil)).To(MatchError(ErrNilGig))
+		_, err = repo.GetByID(context.Background(), "missing")
+		Expect(err).To(MatchError(domain.ErrGigNotFound))
 		Expect(WrapMarshalGigCacheError(errors.New("boom"))).To(MatchError(ContainSubstring("marshal gig cache")))
+		Expect(WrapGetGigCacheError("gig:1", errors.New("boom"))).To(MatchError(ContainSubstring("get gig cache")))
+		Expect(WrapUnmarshalGigCacheError(errors.New("boom"))).To(MatchError(ContainSubstring("unmarshal gig cache")))
 		Expect(WrapSetGigCacheError("gig:1", errors.New("boom"))).To(MatchError(ContainSubstring("set gig cache")))
 		Expect(WrapDeleteGigCacheError("gig:1", errors.New("boom"))).To(MatchError(ContainSubstring("delete gig cache")))
 	})

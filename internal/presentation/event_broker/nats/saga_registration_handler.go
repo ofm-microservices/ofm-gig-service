@@ -4,7 +4,7 @@ import (
 	"context"
 )
 
-func (s *gigProjectionSubscriber) handleGigPublishedEvent(ctx context.Context, _ string, payload []byte) error {
+func (s *gigProjectionSubscriber) handleGigProjectionRequestedEvent(ctx context.Context, _ string, payload []byte) error {
 	gig, err := s.mapr.FromPublishedPayload(payload)
 	if err != nil {
 		return err
@@ -16,7 +16,12 @@ func (s *gigProjectionSubscriber) handleGigPublishedEvent(ctx context.Context, _
 		return ErrInvalidGigPayload
 	}
 
-	if err := s.writer.Upsert(ctx, gig); err != nil {
+	projected, err := s.svc.Project(ctx, gig)
+	if err != nil {
+		return err
+	}
+
+	if err := s.writer.Upsert(ctx, projected); err != nil {
 		return err
 	}
 

@@ -93,6 +93,36 @@ func (mr *MockFileServiceMockRecorder) DeleteFile(ctx, fileID any) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteFile", reflect.TypeOf((*MockFileService)(nil).DeleteFile), ctx, fileID)
 }
 
+// GetFileURL mocks base method.
+func (m *MockFileService) GetFileURL(ctx context.Context, fileID string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetFileURL", ctx, fileID)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetFileURL indicates an expected call of GetFileURL.
+func (mr *MockFileServiceMockRecorder) GetFileURL(ctx, fileID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFileURL", reflect.TypeOf((*MockFileService)(nil).GetFileURL), ctx, fileID)
+}
+
+// GetFileURLs mocks base method.
+func (m *MockFileService) GetFileURLs(ctx context.Context, fileIDs []string) (map[string]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetFileURLs", ctx, fileIDs)
+	ret0, _ := ret[0].(map[string]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetFileURLs indicates an expected call of GetFileURLs.
+func (mr *MockFileServiceMockRecorder) GetFileURLs(ctx, fileIDs any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFileURLs", reflect.TypeOf((*MockFileService)(nil).GetFileURLs), ctx, fileIDs)
+}
+
 // UploadFiles mocks base method.
 func (m *MockFileService) UploadFiles(ctx context.Context, ownerID, prefix string, files []domain.MediaUpload) ([]string, error) {
 	m.ctrl.T.Helper()
@@ -172,17 +202,17 @@ func (m *MockSlugger) EXPECT() *MockSluggerMockRecorder {
 }
 
 // Generate mocks base method.
-func (m *MockSlugger) Generate(title string) string {
+func (m *MockSlugger) Generate(title, gigID string) string {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Generate", title)
+	ret := m.ctrl.Call(m, "Generate", title, gigID)
 	ret0, _ := ret[0].(string)
 	return ret0
 }
 
 // Generate indicates an expected call of Generate.
-func (mr *MockSluggerMockRecorder) Generate(title any) *gomock.Call {
+func (mr *MockSluggerMockRecorder) Generate(title, gigID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Generate", reflect.TypeOf((*MockSlugger)(nil).Generate), title)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Generate", reflect.TypeOf((*MockSlugger)(nil).Generate), title, gigID)
 }
 
 // MockGigService is a mock of GigService interface.
@@ -237,6 +267,36 @@ func (m *MockGigService) GetByID(ctx context.Context, gigID, freelancerID string
 func (mr *MockGigServiceMockRecorder) GetByID(ctx, gigID, freelancerID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByID", reflect.TypeOf((*MockGigService)(nil).GetByID), ctx, gigID, freelancerID)
+}
+
+// GetPublicByID mocks base method.
+func (m *MockGigService) GetPublicByID(ctx context.Context, gigID string) (*domain.Gig, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPublicByID", ctx, gigID)
+	ret0, _ := ret[0].(*domain.Gig)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPublicByID indicates an expected call of GetPublicByID.
+func (mr *MockGigServiceMockRecorder) GetPublicByID(ctx, gigID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPublicByID", reflect.TypeOf((*MockGigService)(nil).GetPublicByID), ctx, gigID)
+}
+
+// Project mocks base method.
+func (m *MockGigService) Project(ctx context.Context, gig *domain.Gig) (*domain.Gig, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Project", ctx, gig)
+	ret0, _ := ret[0].(*domain.Gig)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Project indicates an expected call of Project.
+func (mr *MockGigServiceMockRecorder) Project(ctx, gig any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Project", reflect.TypeOf((*MockGigService)(nil).Project), ctx, gig)
 }
 
 // GetOrderStartSnapshot mocks base method.

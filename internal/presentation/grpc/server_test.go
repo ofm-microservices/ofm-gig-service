@@ -194,9 +194,13 @@ var _ = Describe("gig gRPC server", func() {
 			svc.EXPECT().ReplaceMedia(gomock.Any(), "gig-1", "freelancer-1", gomock.Any()).Return(&domain.Gig{ID: "gig-1"}, nil)
 			return impl.ReplaceMedia(context.Background(), &gigv1.ReplaceMediaRequest{GigId: "gig-1", FreelancerId: "freelancer-1", Files: []*gigv1.MediaUpload{{Filename: "file", ContentType: "image/jpeg", Data: []byte("x")}}})
 		}),
-		Entry("GetDraft", func(impl *server) (any, error) {
+	Entry("GetDraft", func(impl *server) (any, error) {
 			svc.EXPECT().GetByID(gomock.Any(), "gig-1", "freelancer-1").Return(&domain.Gig{ID: "gig-1"}, nil)
 			return impl.GetDraft(context.Background(), &gigv1.GetDraftRequest{GigId: "gig-1", FreelancerId: "freelancer-1"})
+		}),
+		Entry("GetGigBySlug", func(impl *server) (any, error) {
+			svc.EXPECT().GetPublicByID(gomock.Any(), "019e706c-616e-7473-9c1a-838c33b75013").Return(&domain.Gig{ID: "019e706c-616e-7473-9c1a-838c33b75013"}, nil)
+			return impl.GetGigBySlug(context.Background(), &gigv1.GetGigBySlugRequest{Slug: "my-gig-019e706c-616e-7473-9c1a-838c33b75013"})
 		}),
 		Entry("Publish", func(impl *server) (any, error) {
 			svc.EXPECT().Publish(gomock.Any(), "gig-1", "freelancer-1").Return(&domain.Gig{ID: "gig-1"}, nil)

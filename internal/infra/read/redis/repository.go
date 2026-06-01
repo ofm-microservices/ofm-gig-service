@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	app "gig-service/internal/application"
 	"gig-service/internal/domain"
@@ -51,7 +52,7 @@ func (r *repo) Upsert(ctx context.Context, gig *domain.Gig) error {
 		return ErrNilGig
 	}
 
-	payload, err := r.mapr.ToPublishedPayload(gig)
+	payload, err := r.mapr.ToReadModelPayload(gig)
 	if err != nil {
 		status = "error"
 		r.log.Error("upsert gig failed",
@@ -81,6 +82,49 @@ func (r *repo) Upsert(ctx context.Context, gig *domain.Gig) error {
 	}
 
 	return nil
+}
+
+// GetByID loads the gig read model from Redis.
+func (r *repo) GetByID(ctx context.Context, gigID string) (*domain.Gig, error) {
+	started := time.Now()
+	status := "success"
+	defer func() { metrics.Global().ObserveRedis("get", "gig", status, time.Since(started)) }()
+
+	key := GigCacheKey(gigID)
+	raw, err := r.rdb.Get(ctx, key).Result()
+	if err != nil {
+		status = "error"
+		if errors.Is(err, redis.Nil) {
+			return nil, domain.ErrGigNotFound
+		}
+		r.log.Error("get gig failed",
+			logging.Operation("redis.gig.get_by_id"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", gigID),
+			logging.String("cache_key", key),
+			logging.Err(err),
+		)
+		return nil, WrapGetGigCacheError(key, err)
+	}
+
+	gig, err := r.mapr.FromReadModelPayload([]byte(raw))
+	if err != nil {
+		status = "error"
+		r.log.Error("get gig failed",
+			logging.Operation("redis.gig.get_by_id"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", gigID),
+			logging.String("cache_key", key),
+			logging.Err(err),
+		)
+		return nil, WrapUnmarshalGigCacheError(err)
+	}
+
+	return gig, nil
 }
 
 // DeleteByID removes the gig read model from Redis.

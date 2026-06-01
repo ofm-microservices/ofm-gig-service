@@ -48,6 +48,41 @@ func (m *fileMapper) ToUploadFilesResponse(res *filev1.UploadFilesResponse) []st
 	return ids
 }
 
+func (m *fileMapper) ToGetFileURLRequest(fileID string) *filev1.GetFileURLRequest {
+	return &filev1.GetFileURLRequest{FileId: fileID}
+}
+
+func (m *fileMapper) ToGetFileURLResponse(res *filev1.GetFileURLResponse) string {
+	if res == nil {
+		return ""
+	}
+	return res.GetUrl()
+}
+
+func (m *fileMapper) ToGetFileURLsRequest(fileIDs []string) *filev1.GetFileURLsRequest {
+	return &filev1.GetFileURLsRequest{FileIds: fileIDs}
+}
+
+func (m *fileMapper) ToGetFileURLsResponse(res *filev1.GetFileURLsResponse) map[string]string {
+	if res == nil || len(res.GetFileUrls()) == 0 {
+		return nil
+	}
+
+	urls := make(map[string]string, len(res.GetFileUrls()))
+	for _, item := range res.GetFileUrls() {
+		if item == nil {
+			continue
+		}
+		urls[item.GetFileId()] = item.GetUrl()
+	}
+
+	if len(urls) == 0 {
+		return nil
+	}
+
+	return urls
+}
+
 func (m *fileMapper) ToDeleteFileRequest(fileID string) *filev1.DeleteFileRequest {
 	return &filev1.DeleteFileRequest{FileId: fileID}
 }

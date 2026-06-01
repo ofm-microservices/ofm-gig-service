@@ -39,6 +39,39 @@ func (f *fakeNatsConn) PublishMsg(msg *nats.Msg) error {
 	return f.Publish(msg.Subject, msg.Data)
 }
 
+type fakeGigService struct{}
+
+func (fakeGigService) CreateDraft(context.Context, string) (*domain.Gig, error) {
+	return &domain.Gig{ID: "gig-1"}, nil
+}
+func (fakeGigService) UpdateBasicInfo(context.Context, string, string, domain.UpdateBasicInfoParams) (*domain.Gig, error) {
+	return &domain.Gig{ID: "gig-1"}, nil
+}
+func (fakeGigService) ReplacePackages(context.Context, string, string, domain.ReplacePackagesParams) (*domain.Gig, error) {
+	return &domain.Gig{ID: "gig-1"}, nil
+}
+func (fakeGigService) ReplaceQuestions(context.Context, string, string, domain.ReplaceQuestionsParams) (*domain.Gig, error) {
+	return &domain.Gig{ID: "gig-1"}, nil
+}
+func (fakeGigService) ReplaceMedia(context.Context, string, string, domain.ReplaceMediaUploadParams) (*domain.Gig, error) {
+	return &domain.Gig{ID: "gig-1"}, nil
+}
+func (fakeGigService) GetByID(context.Context, string, string) (*domain.Gig, error) {
+	return &domain.Gig{ID: "gig-1"}, nil
+}
+func (fakeGigService) GetPublicByID(context.Context, string) (*domain.Gig, error) {
+	return &domain.Gig{ID: "gig-1"}, nil
+}
+func (fakeGigService) GetOrderStartSnapshot(context.Context, string, string) (*app.OrderStartSnapshot, error) {
+	return &app.OrderStartSnapshot{GigID: "gig-1", PackageID: "pkg-1", SellerID: "seller-1", GigTitle: "Gig", PackageTitle: "Basic", PackageDescription: "desc", PriceCents: 1, Currency: "usd", DeliveryDays: 1, PackageAvailable: true}, nil
+}
+func (fakeGigService) Publish(context.Context, string, string) (*domain.Gig, error) {
+	return &domain.Gig{ID: "gig-1"}, nil
+}
+func (fakeGigService) Project(_ context.Context, gig *domain.Gig) (*domain.Gig, error) {
+	return gig, nil
+}
+
 func (f *fakeNatsConn) Subscribe(_ string, cb nats.MsgHandler) (*nats.Subscription, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -103,6 +136,8 @@ type fakeGigMapper struct {
 
 func (m *fakeGigMapper) FromPublishedPayload([]byte) (*domain.Gig, error) { return m.gig, m.err }
 func (m *fakeGigMapper) ToPublishedPayload(*domain.Gig) ([]byte, error)   { return nil, nil }
+func (m *fakeGigMapper) FromReadModelPayload([]byte) (*domain.Gig, error) { return m.gig, m.err }
+func (m *fakeGigMapper) ToReadModelPayload(*domain.Gig) ([]byte, error)   { return nil, nil }
 
 var _ = Describe("nats broker helpers", func() {
 	var logger logging.Logger
@@ -254,9 +289,10 @@ var _ = Describe("nats broker helpers", func() {
 		DeferCleanup(ctrl.Finish)
 		writer := NewMockProjectionWriter(ctrl)
 		mapper := app.NewGigEventMapper()
-		subscriber, err := NewGigProjectionSubscriber(broker, writer, mapper, config.NATSConfig{
+		subscriber, err := NewGigProjectionSubscriber(broker, fakeGigService{}, writer, mapper, config.NATSConfig{
 			GigEventsStream:              "GIG_EVENTS",
 			GigPublishedSubject:          "gig.published",
+			GigProjectionSubject:         "gig.projection.requested",
 			GigProjectionBatchSize:       7,
 			GigProjectionMaxWait:         8 * time.Second,
 			GigProjectionWorkers:         3,
@@ -270,18 +306,18 @@ var _ = Describe("nats broker helpers", func() {
 
 		Expect(subscriber.Subscribe(context.Background())).To(Succeed())
 		Expect(broker.cfg.Stream).To(Equal("GIG_EVENTS"))
-		Expect(broker.cfg.Subject).To(Equal("gig.published"))
+		Expect(broker.cfg.Subject).To(Equal("gig.projection.requested"))
 		Expect(broker.cfg.BatchSize).To(Equal(7))
 	})
 
 	It("rejects nil projection dependencies", func() {
-		_, err := NewGigProjectionSubscriber(nil, &fakeProjectionWriter{}, app.NewGigEventMapper(), config.NATSConfig{}, logger)
+		_, err := NewGigProjectionSubscriber(nil, fakeGigService{}, &fakeProjectionWriter{}, app.NewGigEventMapper(), config.NATSConfig{}, logger)
 		Expect(err).To(MatchError(ErrNilBroker))
 
-		_, err = NewGigProjectionSubscriber(&fakeEventBroker{}, nil, app.NewGigEventMapper(), config.NATSConfig{}, logger)
+		_, err = NewGigProjectionSubscriber(&fakeEventBroker{}, fakeGigService{}, nil, app.NewGigEventMapper(), config.NATSConfig{}, logger)
 		Expect(err).To(MatchError(ErrNilProjectionWriter))
 
-		_, err = NewGigProjectionSubscriber(&fakeEventBroker{}, &fakeProjectionWriter{}, app.NewGigEventMapper(), config.NATSConfig{}, nil)
+		_, err = NewGigProjectionSubscriber(&fakeEventBroker{}, fakeGigService{}, &fakeProjectionWriter{}, app.NewGigEventMapper(), config.NATSConfig{}, nil)
 		Expect(err).To(MatchError(ErrNilLogger))
 	})
 
@@ -289,38 +325,38 @@ var _ = Describe("nats broker helpers", func() {
 		ctrl := gomock.NewController(GinkgoT())
 		DeferCleanup(ctrl.Finish)
 		writer := NewMockProjectionWriter(ctrl)
-		subscriber, err := NewGigProjectionSubscriber(&fakeEventBroker{}, writer, app.NewGigEventMapper(), config.NATSConfig{}, logger)
+		subscriber, err := NewGigProjectionSubscriber(&fakeEventBroker{}, fakeGigService{}, writer, app.NewGigEventMapper(), config.NATSConfig{}, logger)
 		Expect(err).NotTo(HaveOccurred())
 		impl := subscriber.(*gigProjectionSubscriber)
 
-		Expect(impl.handleGigPublishedEvent(context.Background(), "gig.published", []byte("bad"))).To(HaveOccurred())
-		Expect(impl.handleGigPublishedEvent(context.Background(), "gig.published", []byte(`{"gig_id":""}`))).To(MatchError(ErrInvalidGigPayload))
+		Expect(impl.handleGigProjectionRequestedEvent(context.Background(), "gig.projection.requested", []byte("bad"))).To(HaveOccurred())
+		Expect(impl.handleGigProjectionRequestedEvent(context.Background(), "gig.projection.requested", []byte(`{"gig_id":""}`))).To(MatchError(ErrInvalidGigPayload))
 
 		payload, err := app.NewGigEventMapper().ToPublishedPayload(&domain.Gig{ID: "gig-1", FreelancerID: "freelancer-1", Status: domain.StatusDraft, BasicInfoCompleted: true, PackagesCompleted: true, RequirementsCompleted: true, MediaCompleted: true, Packages: []domain.GigPackage{{Tier: domain.TierBasic, Description: "basic", DeliveryDays: 1, PriceCents: 1}}})
 		Expect(err).NotTo(HaveOccurred())
 		writer.EXPECT().Upsert(gomock.Any(), gomock.Any()).Return(nil)
-		Expect(impl.handleGigPublishedEvent(context.Background(), "gig.published", payload)).To(Succeed())
+		Expect(impl.handleGigProjectionRequestedEvent(context.Background(), "gig.projection.requested", payload)).To(Succeed())
 	})
 
 	It("handles invalid payloads and writer failures", func() {
 		ctrl := gomock.NewController(GinkgoT())
 		DeferCleanup(ctrl.Finish)
 		writer := NewMockProjectionWriter(ctrl)
-		subscriber, err := NewGigProjectionSubscriber(&fakeEventBroker{}, writer, &fakeGigMapper{}, config.NATSConfig{}, logger)
+		subscriber, err := NewGigProjectionSubscriber(&fakeEventBroker{}, fakeGigService{}, writer, &fakeGigMapper{}, config.NATSConfig{}, logger)
 		Expect(err).NotTo(HaveOccurred())
 		impl := subscriber.(*gigProjectionSubscriber)
 
-		Expect(impl.handleGigPublishedEvent(context.Background(), "gig.published", []byte("payload"))).To(MatchError("invalid gig payload"))
+		Expect(impl.handleGigProjectionRequestedEvent(context.Background(), "gig.projection.requested", []byte("payload"))).To(MatchError("invalid gig payload"))
 
 		impl.mapr = &fakeGigMapper{gig: nil}
-		Expect(impl.handleGigPublishedEvent(context.Background(), "gig.published", []byte("payload"))).To(MatchError("invalid gig payload"))
+		Expect(impl.handleGigProjectionRequestedEvent(context.Background(), "gig.projection.requested", []byte("payload"))).To(MatchError("invalid gig payload"))
 
 		impl.mapr = &fakeGigMapper{gig: &domain.Gig{}}
-		Expect(impl.handleGigPublishedEvent(context.Background(), "gig.published", []byte("payload"))).To(MatchError("invalid gig payload"))
+		Expect(impl.handleGigProjectionRequestedEvent(context.Background(), "gig.projection.requested", []byte("payload"))).To(MatchError("invalid gig payload"))
 
 		impl.mapr = &fakeGigMapper{gig: &domain.Gig{ID: "gig-1"}}
 		writer.EXPECT().Upsert(gomock.Any(), gomock.Any()).Return(errors.New("write"))
-		Expect(impl.handleGigPublishedEvent(context.Background(), "gig.published", []byte("payload"))).To(MatchError(ContainSubstring("write")))
+		Expect(impl.handleGigProjectionRequestedEvent(context.Background(), "gig.projection.requested", []byte("payload"))).To(MatchError(ContainSubstring("write")))
 	})
 
 	It("runs a pull consumer when validation and runtime creation succeed", func() {

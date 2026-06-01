@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 	"gig-service/config"
+	"gig-service/internal/domain"
 	"net"
+	"strings"
 
+	"github.com/google/uuid"
 	"github.com/ofm-microservices/ofm-common/pkg/logging"
 	"github.com/ofm-microservices/ofm-common/pkg/observability/metrics"
 	gigv1 "github.com/ofm-microservices/ofm-common/proto/gig/v1"
@@ -220,6 +223,40 @@ func (s *server) GetOrderStartSnapshot(ctx context.Context, req *gigv1.GetOrderS
 	return &gigv1.GetOrderStartSnapshotResponse{Snapshot: s.mapr.ToOrderStartSnapshot(snapshot)}, nil
 }
 
+// GetGigBySlug returns the public gig detail view for the provided slug.
+func (s *server) GetGigBySlug(ctx context.Context, req *gigv1.GetGigBySlugRequest) (*gigv1.GetGigBySlugResponse, error) {
+	started := time.Now()
+	log := logging.WithContext(ctx, s.log)
+	gigID, err := parseGigIDFromSlug(req.GetSlug())
+	if err != nil {
+		log.Error("get gig by slug failed",
+			logging.Operation("grpc.gig.get_by_slug"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("slug", req.GetSlug()),
+			logging.Err(err),
+		)
+		return nil, s.mapr.ToError(err)
+	}
+
+	gig, err := s.svc.GetPublicByID(ctx, gigID)
+	if err != nil {
+		log.Error("get gig by slug failed",
+			logging.Operation("grpc.gig.get_by_slug"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("slug", req.GetSlug()),
+			logging.String("gig_id", gigID),
+			logging.Err(err),
+		)
+		return nil, s.mapr.ToError(err)
+	}
+
+	return s.mapr.ToGetGigBySlugResponse(gig), nil
+}
+
 // Publish makes the gig visible and emits the published event.
 func (s *server) Publish(ctx context.Context, req *gigv1.PublishRequest) (*gigv1.PublishResponse, error) {
 	started := time.Now()
@@ -239,4 +276,23 @@ func (s *server) Publish(ctx context.Context, req *gigv1.PublishRequest) (*gigv1
 	}
 
 	return &gigv1.PublishResponse{Gig: s.mapr.ToGigResponse(gig)}, nil
+}
+
+func parseGigIDFromSlug(slug string) (string, error) {
+	slug = strings.TrimSpace(slug)
+	if slug == "" {
+		return "", domain.ErrInvalidGigSlug
+	}
+	if len(slug) <= 37 {
+		return "", domain.ErrInvalidGigSlug
+	}
+	if slug[len(slug)-37] != '-' {
+		return "", domain.ErrInvalidGigSlug
+	}
+	gigID := slug[len(slug)-36:]
+	parsed, err := uuid.Parse(gigID)
+	if err != nil || parsed.Version() != 7 {
+		return "", domain.ErrInvalidGigSlug
+	}
+	return gigID, nil
 }

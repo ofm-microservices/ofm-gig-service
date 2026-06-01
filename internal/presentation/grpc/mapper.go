@@ -17,6 +17,7 @@ type GigMapper interface {
 	ToCreateDraftResponse(gig *domain.Gig) *gigv1.CreateDraftResponse
 	ToGigResponse(gig *domain.Gig) *gigv1.Gig
 	ToOrderStartSnapshot(snapshot *service.OrderStartSnapshot) *gigv1.OrderStartSnapshot
+	ToGetGigBySlugResponse(gig *domain.Gig) *gigv1.GetGigBySlugResponse
 	ToUpdateBasicInfoParams(req *gigv1.UpdateBasicInfoRequest) domain.UpdateBasicInfoParams
 	ToReplacePackagesParams(req *gigv1.ReplacePackagesRequest) domain.ReplacePackagesParams
 	ToReplaceQuestionsParams(req *gigv1.ReplaceQuestionsRequest) domain.ReplaceQuestionsParams
@@ -46,6 +47,7 @@ func (m *gigMapper) ToGigResponse(gig *domain.Gig) *gigv1.Gig {
 	resp := &gigv1.Gig{
 		GigId:                 gig.ID,
 		FreelancerId:          gig.FreelancerID,
+		Slug:                  gig.Slug,
 		Title:                 gig.Title,
 		Description:           gig.Description,
 		CategoryId:            gig.CategoryID,
@@ -56,6 +58,7 @@ func (m *gigMapper) ToGigResponse(gig *domain.Gig) *gigv1.Gig {
 		RequirementsCompleted: gig.RequirementsCompleted,
 		MediaCompleted:        gig.MediaCompleted,
 		PictureFileId:         gig.PictureFileID,
+		PictureUrl:            gig.PictureURL,
 		CreatedAt:             gig.CreatedAt.UTC().Format(timeFormat),
 		UpdatedAt:             gig.UpdatedAt.UTC().Format(timeFormat),
 	}
@@ -97,6 +100,7 @@ func (m *gigMapper) ToGigResponse(gig *domain.Gig) *gigv1.Gig {
 				Id:        item.FileID,
 				GigId:     item.GigID,
 				FileId:    item.FileID,
+				Url:       item.URL,
 				SortOrder: item.SortOrder,
 			})
 		}
@@ -134,6 +138,10 @@ func (m *gigMapper) ToOrderStartSnapshot(snapshot *service.OrderStartSnapshot) *
 		}
 	}
 	return resp
+}
+
+func (m *gigMapper) ToGetGigBySlugResponse(gig *domain.Gig) *gigv1.GetGigBySlugResponse {
+	return &gigv1.GetGigBySlugResponse{Gig: m.toPublicGigResponse(gig)}
 }
 
 func (m *gigMapper) ToUpdateBasicInfoParams(req *gigv1.UpdateBasicInfoRequest) domain.UpdateBasicInfoParams {
@@ -189,11 +197,59 @@ func (m *gigMapper) ToReplaceMediaParams(req *gigv1.ReplaceMediaRequest) domain.
 	return domain.ReplaceMediaUploadParams{Files: files}
 }
 
+func (m *gigMapper) toPublicGigResponse(gig *domain.Gig) *gigv1.Gig {
+	if gig == nil {
+		return nil
+	}
+
+	resp := &gigv1.Gig{
+		GigId:        gig.ID,
+		FreelancerId: gig.FreelancerID,
+		Slug:         gig.Slug,
+		Title:        gig.Title,
+		Description:  gig.Description,
+		CategoryId:   gig.CategoryID,
+		Currency:     gig.Currency,
+		PictureUrl:   gig.PictureURL,
+		CreatedAt:    gig.CreatedAt.UTC().Format(timeFormat),
+		UpdatedAt:    gig.UpdatedAt.UTC().Format(timeFormat),
+	}
+	if gig.PublishedAt != nil {
+		resp.PublishedAt = gig.PublishedAt.UTC().Format(timeFormat)
+	}
+	if len(gig.Packages) > 0 {
+		resp.Packages = make([]*gigv1.GigPackage, 0, len(gig.Packages))
+		for _, pkg := range gig.Packages {
+			resp.Packages = append(resp.Packages, &gigv1.GigPackage{
+				Id:           pkg.ID,
+				GigId:        pkg.GigID,
+				Tier:         pkg.Tier,
+				Description:  pkg.Description,
+				DeliveryDays: pkg.DeliveryDays,
+				PriceCents:   pkg.PriceCents,
+				SortOrder:    pkg.SortOrder,
+			})
+		}
+	}
+	if len(gig.Media) > 0 {
+		resp.Media = make([]*gigv1.GigMedia, 0, len(gig.Media))
+		for _, item := range gig.Media {
+			resp.Media = append(resp.Media, &gigv1.GigMedia{
+				GigId:     item.GigID,
+				Url:       item.URL,
+				SortOrder: item.SortOrder,
+			})
+		}
+	}
+	return resp
+}
+
 func (m *gigMapper) ToError(err error) error {
 	switch {
 	case err == nil:
 		return nil
 	case errors.Is(err, domain.ErrInvalidGigID),
+		errors.Is(err, domain.ErrInvalidGigSlug),
 		errors.Is(err, domain.ErrInvalidFreelancerID),
 		errors.Is(err, domain.ErrInvalidTitle),
 		errors.Is(err, domain.ErrInvalidDescription),

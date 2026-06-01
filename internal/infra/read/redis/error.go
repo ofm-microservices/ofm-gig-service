@@ -21,6 +21,16 @@ func WrapSetGigCacheError(key string, err error) error {
 	return fmt.Errorf("set gig cache by key %q: %w", key, err)
 }
 
+// WrapGetGigCacheError annotates Redis fetch failures for the gig cache.
+func WrapGetGigCacheError(key string, err error) error {
+	return fmt.Errorf("get gig cache by key %q: %w", key, err)
+}
+
+// WrapUnmarshalGigCacheError annotates cache deserialization failures.
+func WrapUnmarshalGigCacheError(err error) error {
+	return fmt.Errorf("unmarshal gig cache: %w", err)
+}
+
 // WrapDeleteGigCacheError annotates Redis delete failures for the gig cache.
 func WrapDeleteGigCacheError(key string, err error) error {
 	return fmt.Errorf("delete gig cache by key %q: %w", key, err)
