@@ -2,25 +2,30 @@ package service
 
 import (
 	"context"
+	"errors"
 	"gig-service/internal/domain"
 	"github.com/ofm-microservices/ofm-common/pkg/logging"
 	"strings"
 )
 
 type gigService struct {
-	repo    domain.GigRepository
-	files   FileService
-	connect ConnectStatusChecker
-	broker  EventBroker
-	slug    Slugger
-	mapr    GigEventMapper
-	log     Logger
+	repo     domain.GigRepository
+	readRepo domain.GigReadRepository
+	files    FileService
+	connect  ConnectStatusChecker
+	broker   EventBroker
+	slug     Slugger
+	mapr     GigEventMapper
+	log      Logger
 }
 
 // New constructs the gig application service.
-func New(repo domain.GigRepository, files FileService, connect ConnectStatusChecker, broker EventBroker, slugger Slugger, log Logger) (GigService, error) {
+func New(repo domain.GigRepository, readRepo domain.GigReadRepository, files FileService, connect ConnectStatusChecker, broker EventBroker, slugger Slugger, log Logger) (GigService, error) {
 	if repo == nil {
 		return nil, ErrNilGigRepository
+	}
+	if readRepo == nil {
+		return nil, ErrNilGigReadRepository
 	}
 	if files == nil {
 		return nil, ErrNilFileService
@@ -39,13 +44,14 @@ func New(repo domain.GigRepository, files FileService, connect ConnectStatusChec
 	}
 
 	return &gigService{
-		repo:    repo,
-		files:   files,
-		connect: connect,
-		broker:  broker,
-		slug:    slugger,
-		mapr:    NewGigEventMapper(),
-		log:     log.With(logging.String("module", "application")),
+		repo:     repo,
+		readRepo: readRepo,
+		files:    files,
+		connect:  connect,
+		broker:   broker,
+		slug:     slugger,
+		mapr:     NewGigEventMapper(),
+		log:      log.With(logging.String("module", "application")),
 	}, nil
 }
 
@@ -82,18 +88,26 @@ func (s *gigService) UpdateBasicInfo(ctx context.Context, gigID, freelancerID st
 	if strings.TrimSpace(params.Currency) == "" {
 		return nil, domain.ErrInvalidCurrency
 	}
-	slug := s.slug.Generate(title)
+	slug := s.slug.Generate(title, gig.ID)
 	if slug == "" {
 		return nil, domain.ErrInvalidTitle
 	}
 
-	return s.repo.UpdateBasicInfo(ctx, gig.ID, domain.UpdateBasicInfoParams{
+	gig, err = s.repo.UpdateBasicInfo(ctx, gig.ID, domain.UpdateBasicInfoParams{
 		Title:       title,
 		Slug:        slug,
 		Description: strings.TrimSpace(params.Description),
 		CategoryID:  params.CategoryID,
 		Currency:    strings.TrimSpace(params.Currency),
 	})
+	if err != nil {
+		return nil, err
+	}
+	if err := s.publishProjection(ctx, gig); err != nil {
+		return nil, err
+	}
+
+	return gig, nil
 }
 
 func (s *gigService) ReplacePackages(ctx context.Context, gigID, freelancerID string, params domain.ReplacePackagesParams) (*domain.Gig, error) {
@@ -122,7 +136,15 @@ func (s *gigService) ReplacePackages(ctx context.Context, gigID, freelancerID st
 		return nil, err
 	}
 
-	return s.repo.ReplacePackages(ctx, gig.ID, params)
+	gig, err = s.repo.ReplacePackages(ctx, gig.ID, params)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.publishProjection(ctx, gig); err != nil {
+		return nil, err
+	}
+
+	return gig, nil
 }
 
 func (s *gigService) ReplaceQuestions(ctx context.Context, gigID, freelancerID string, params domain.ReplaceQuestionsParams) (*domain.Gig, error) {
@@ -136,7 +158,15 @@ func (s *gigService) ReplaceQuestions(ctx context.Context, gigID, freelancerID s
 		}
 	}
 
-	return s.repo.ReplaceQuestions(ctx, gig.ID, params)
+	gig, err = s.repo.ReplaceQuestions(ctx, gig.ID, params)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.publishProjection(ctx, gig); err != nil {
+		return nil, err
+	}
+
+	return gig, nil
 }
 
 func (s *gigService) ReplaceMedia(ctx context.Context, gigID, freelancerID string, params domain.ReplaceMediaUploadParams) (*domain.Gig, error) {
@@ -165,6 +195,9 @@ func (s *gigService) ReplaceMedia(ctx context.Context, gigID, freelancerID strin
 		s.compensateUploadedFiles(ctx, fileIDs)
 		return nil, err
 	}
+	if err := s.publishProjection(ctx, gig); err != nil {
+		return nil, err
+	}
 
 	return gig, nil
 }
@@ -172,6 +205,39 @@ func (s *gigService) ReplaceMedia(ctx context.Context, gigID, freelancerID strin
 func (s *gigService) GetByID(ctx context.Context, gigID, freelancerID string) (*domain.Gig, error) {
 	gig, err := s.getOwnedGig(ctx, gigID, freelancerID)
 	if err != nil {
+		return nil, err
+	}
+
+	return gig, nil
+}
+
+func (s *gigService) GetPublicByID(ctx context.Context, gigID string) (*domain.Gig, error) {
+	gigID = strings.TrimSpace(gigID)
+	if gigID == "" {
+		return nil, domain.ErrInvalidGigID
+	}
+
+	gig, err := s.readRepo.GetByID(ctx, gigID)
+	if err == nil && gig != nil {
+		return gig, nil
+	}
+	if err != nil && !errors.Is(err, domain.ErrGigNotFound) {
+		return nil, err
+	}
+
+	gig, err = s.repo.GetByID(ctx, gigID)
+	if err != nil {
+		return nil, err
+	}
+	if gig.Status != domain.StatusPublished {
+		return nil, domain.ErrGigNotFound
+	}
+
+	gig, err = s.Project(ctx, gig)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.readRepo.Upsert(ctx, gig); err != nil {
 		return nil, err
 	}
 
@@ -207,18 +273,18 @@ func (s *gigService) GetOrderStartSnapshot(ctx context.Context, gigID, packageID
 	}
 
 	snapshot := &OrderStartSnapshot{
-		GigID:            gig.ID,
-		PackageID:        pkg.ID,
-		SellerID:         gig.FreelancerID,
-		GigTitle:         gig.Title,
-		PackageTitle:     pkg.Tier,
+		GigID:              gig.ID,
+		PackageID:          pkg.ID,
+		SellerID:           gig.FreelancerID,
+		GigTitle:           gig.Title,
+		PackageTitle:       pkg.Tier,
 		PackageDescription: pkg.Description,
-		PriceCents:       pkg.PriceCents,
-		Currency:         gig.Currency,
-		DeliveryDays:     pkg.DeliveryDays,
-		RevisionCount:    int32(len(gig.Questions)),
-		GigPublished:     gig.Status == domain.StatusPublished,
-		PackageAvailable: true,
+		PriceCents:         pkg.PriceCents,
+		Currency:           gig.Currency,
+		DeliveryDays:       pkg.DeliveryDays,
+		RevisionCount:      int32(len(gig.Questions)),
+		GigPublished:       gig.Status == domain.StatusPublished,
+		PackageAvailable:   true,
 	}
 	if len(gig.Questions) > 0 {
 		snapshot.Questions = make([]OrderStartQuestion, 0, len(gig.Questions))
@@ -263,8 +329,68 @@ func (s *gigService) Publish(ctx context.Context, gigID, freelancerID string) (*
 	if err := s.broker.Publish(ctx, gigPublishedSubject, payload); err != nil {
 		return nil, err
 	}
+	if err := s.publishProjection(ctx, gig); err != nil {
+		return nil, err
+	}
 
 	return gig, nil
+}
+
+func (s *gigService) Project(ctx context.Context, gig *domain.Gig) (*domain.Gig, error) {
+	if gig == nil {
+		return nil, domain.ErrGigNotFound
+	}
+
+	projected := *gig
+	fileIDs := make([]string, 0, 1+len(gig.Media))
+	seen := make(map[string]struct{}, 1+len(gig.Media))
+	if picture := strings.TrimSpace(projected.PictureFileID); picture != "" {
+		fileIDs = append(fileIDs, picture)
+		seen[picture] = struct{}{}
+	}
+	for _, item := range gig.Media {
+		if fileID := strings.TrimSpace(item.FileID); fileID != "" {
+			if _, ok := seen[fileID]; ok {
+				continue
+			}
+			seen[fileID] = struct{}{}
+			fileIDs = append(fileIDs, fileID)
+		}
+	}
+
+	urls := map[string]string{}
+	if len(fileIDs) > 0 {
+		resolved, err := s.files.GetFileURLs(ctx, fileIDs)
+		if err == nil {
+			urls = resolved
+		}
+	}
+	if picture := strings.TrimSpace(projected.PictureFileID); picture != "" {
+		projected.PictureURL = urls[picture]
+	}
+
+	if len(gig.Media) > 0 {
+		projected.Media = make([]domain.GigMedia, 0, len(gig.Media))
+		for _, item := range gig.Media {
+			media := domain.GigMedia{
+				GigID:     item.GigID,
+				FileID:    item.FileID,
+				SortOrder: item.SortOrder,
+				URL:       urls[strings.TrimSpace(item.FileID)],
+			}
+			projected.Media = append(projected.Media, media)
+		}
+	}
+
+	return &projected, nil
+}
+
+func (s *gigService) publishProjection(ctx context.Context, gig *domain.Gig) error {
+	payload, err := s.mapr.ToPublishedPayload(gig)
+	if err != nil {
+		return err
+	}
+	return s.broker.Publish(ctx, gigProjectionRequestedSubject, payload)
 }
 
 func (s *gigService) getOwnedGig(ctx context.Context, gigID, freelancerID string) (*domain.Gig, error) {

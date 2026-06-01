@@ -4,6 +4,7 @@ import "errors"
 
 var (
 	ErrInvalidGigID                = errors.New("invalid gig id")
+	ErrInvalidGigSlug              = errors.New("invalid gig slug")
 	ErrInvalidFreelancerID         = errors.New("invalid freelancer id")
 	ErrInvalidTitle                = errors.New("invalid title")
 	ErrInvalidDescription          = errors.New("invalid description")

@@ -72,6 +72,7 @@ var _ = Describe("nats bootstrap", func() {
 			URL:                 "nats://unused",
 			GigEventsStream:     "GIG_EVENTS",
 			GigPublishedSubject: "gig.published",
+			GigProjectionSubject:"gig.projection.requested",
 		}, logger)).To(Succeed())
 		Expect(js.addCalls).To(Equal(1))
 
@@ -83,6 +84,7 @@ var _ = Describe("nats bootstrap", func() {
 			URL:                 "nats://unused",
 			GigEventsStream:     "GIG_EVENTS",
 			GigPublishedSubject: "gig.published",
+			GigProjectionSubject:"gig.projection.requested",
 		}, logger)).To(MatchError(ContainSubstring("ensure stream")))
 
 		connectBootstrap = func(config.NATSConfig) (bootstrapConn, error) {

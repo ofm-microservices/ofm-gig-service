@@ -57,6 +57,24 @@ func (c *client) UploadFiles(ctx context.Context, ownerID, prefix string, files 
 	return c.mapr.ToUploadFilesResponse(res), nil
 }
 
+func (c *client) GetFileURL(ctx context.Context, fileID string) (string, error) {
+	res, err := c.cl.GetFileURL(ctx, c.mapr.ToGetFileURLRequest(fileID))
+	if err != nil {
+		return "", c.mapr.ToError(err)
+	}
+
+	return c.mapr.ToGetFileURLResponse(res), nil
+}
+
+func (c *client) GetFileURLs(ctx context.Context, fileIDs []string) (map[string]string, error) {
+	res, err := c.cl.GetFileURLs(ctx, c.mapr.ToGetFileURLsRequest(fileIDs))
+	if err != nil {
+		return nil, c.mapr.ToError(err)
+	}
+
+	return c.mapr.ToGetFileURLsResponse(res), nil
+}
+
 func (c *client) DeleteFile(ctx context.Context, fileID string) error {
 	_, err := c.cl.DeleteFile(ctx, c.mapr.ToDeleteFileRequest(fileID))
 	if err != nil {

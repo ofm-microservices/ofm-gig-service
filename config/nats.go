@@ -11,6 +11,7 @@ type NATSConfig struct {
 
 	GigEventsStream     string `env:"NATS_STREAM_GIG_EVENTS" envDefault:"GIG_EVENTS"`
 	GigPublishedSubject string `env:"NATS_SUBJECT_GIG_PUBLISHED" envDefault:"gig.published"`
+	GigProjectionSubject string `env:"NATS_SUBJECT_GIG_PROJECTION" envDefault:"gig.projection.requested"`
 
 	GigProjectionDurable                 string        `env:"NATS_DURABLE_GIG_PROJECTION" envDefault:"gig_service_gig_projection"`
 	GigProjectionBatchSize               int           `env:"NATS_GIG_PROJECTION_BATCH_SIZE" envDefault:"100"`

@@ -31,6 +31,7 @@ type Gig struct {
 	RequirementsCompleted bool
 	MediaCompleted        bool
 	PictureFileID         string
+	PictureURL            string
 	PublishedAt           *time.Time
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
@@ -62,6 +63,7 @@ type GigQuestion struct {
 type GigMedia struct {
 	GigID     string
 	FileID    string
+	URL       string
 	SortOrder int32
 }
 
@@ -123,5 +125,6 @@ type GigRepository interface {
 // GigReadRepository persists the gig read model in Redis.
 type GigReadRepository interface {
 	Upsert(ctx context.Context, gig *Gig) error
+	GetByID(ctx context.Context, gigID string) (*Gig, error)
 	DeleteByID(ctx context.Context, gigID string) error
 }

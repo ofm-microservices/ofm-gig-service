@@ -19,6 +19,7 @@ var RepoModule = fx.Options(
 		writerepo.NewPgErrorTranslator,
 		ProvideWriteRepo,
 		ProvideReadRepo,
+		ProvideProjectionWriter,
 	),
 )
 
@@ -28,6 +29,12 @@ func ProvideWriteRepo(dbx *sqlx.DB, translator writerepo.DBErrorTranslator, lg l
 }
 
 // ProvideReadRepo constructs the Redis-backed gig read-model writer.
-func ProvideReadRepo(rdb *redis.Client, mapr app.GigEventMapper, lg logging.Logger) (events.ProjectionWriter, error) {
+func ProvideReadRepo(rdb *redis.Client, mapr app.GigEventMapper, lg logging.Logger) (domain.GigReadRepository, error) {
 	return readrepo.New(rdb, mapr, lg)
+}
+
+// ProvideProjectionWriter exposes the Redis-backed read repository to the NATS
+// projection layer.
+func ProvideProjectionWriter(repo domain.GigReadRepository) (events.ProjectionWriter, error) {
+	return repo, nil
 }

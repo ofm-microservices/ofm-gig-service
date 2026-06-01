@@ -59,6 +59,7 @@ var _ = Describe("nats bootstrap integration", func() {
 			URL:                 natsBootstrapURL,
 			GigEventsStream:     "GIG_EVENTS",
 			GigPublishedSubject: "gig.published",
+			GigProjectionSubject:"gig.projection.requested",
 		}, natsBootstrapLogger)).To(Succeed())
 
 		js, err := conn.JetStream()
@@ -66,6 +67,7 @@ var _ = Describe("nats bootstrap integration", func() {
 		info, err := js.StreamInfo("GIG_EVENTS")
 		Expect(err).NotTo(HaveOccurred())
 		Expect(info.Config.Subjects).To(ContainElement("gig.published"))
+		Expect(info.Config.Subjects).To(ContainElement("gig.projection.requested"))
 	})
 
 	It("wraps invalid connection parameters", func() {

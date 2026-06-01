@@ -44,7 +44,8 @@ func EnsureStream(cfg config.NATSConfig, log logging.Logger) error {
 	lg := log.With(logging.String("module", "jetstream-bootstrap"))
 	lg.Info("ensuring jetstream stream",
 		logging.String("stream", cfg.GigEventsStream),
-		logging.String("subject", cfg.GigPublishedSubject),
+		logging.String("published_subject", cfg.GigPublishedSubject),
+		logging.String("projection_subject", cfg.GigProjectionSubject),
 	)
 
 	nc, err := connectBootstrap(cfg)
@@ -60,7 +61,7 @@ func EnsureStream(cfg config.NATSConfig, log logging.Logger) error {
 
 	streamCfg := &nats.StreamConfig{
 		Name:      cfg.GigEventsStream,
-		Subjects:  []string{cfg.GigPublishedSubject},
+		Subjects:  []string{cfg.GigPublishedSubject, cfg.GigProjectionSubject},
 		Storage:   nats.FileStorage,
 		Retention: nats.LimitsPolicy,
 		Replicas:  1,

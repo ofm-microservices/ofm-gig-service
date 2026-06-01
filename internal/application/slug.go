@@ -10,6 +10,13 @@ func NewSlugger() Slugger {
 	return slugger{}
 }
 
-func (slugger) Generate(title string) string {
-	return slug.Make(title)
+func (slugger) Generate(title, gigID string) string {
+	base := slug.Make(title)
+	if base == "" {
+		return ""
+	}
+	if gigID == "" {
+		return ""
+	}
+	return base + "-" + gigID
 }

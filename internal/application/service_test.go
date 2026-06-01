@@ -21,20 +21,22 @@ func TestService(t *testing.T) {
 
 var _ = Describe("gigService", func() {
 	var (
-		ctrl    *gomock.Controller
-		repo    *MockGigRepository
-		files   *MockFileService
-		connect *MockConnectStatusChecker
-		broker  *MockEventBroker
-		slugger *MockSlugger
-		logger  logging.Logger
-		svc     GigService
-		ctx     context.Context
+		ctrl     *gomock.Controller
+		repo     *MockGigRepository
+		readRepo *MockGigReadRepository
+		files    *MockFileService
+		connect  *MockConnectStatusChecker
+		broker   *MockEventBroker
+		slugger  *MockSlugger
+		logger   logging.Logger
+		svc      GigService
+		ctx      context.Context
 	)
 
 	BeforeEach(func() {
 		ctrl = gomock.NewController(GinkgoT())
 		repo = NewMockGigRepository(ctrl)
+		readRepo = NewMockGigReadRepository(ctrl)
 		files = NewMockFileService(ctrl)
 		connect = NewMockConnectStatusChecker(ctrl)
 		broker = NewMockEventBroker(ctrl)
@@ -44,7 +46,7 @@ var _ = Describe("gigService", func() {
 		logger, err = logging.New("gig-service", "test", "debug")
 		Expect(err).NotTo(HaveOccurred())
 
-		svc, err = New(repo, files, connect, broker, slugger, logger)
+		svc, err = New(repo, readRepo, files, connect, broker, slugger, logger)
 		Expect(err).NotTo(HaveOccurred())
 		ctx = context.Background()
 	})
@@ -55,27 +57,31 @@ var _ = Describe("gigService", func() {
 
 	Describe("New", func() {
 		It("validates nil dependencies", func() {
-			created, err := New(nil, files, connect, broker, slugger, logger)
+			created, err := New(nil, readRepo, files, connect, broker, slugger, logger)
 			Expect(created).To(BeNil())
 			Expect(err).To(MatchError(ErrNilGigRepository))
 
-			created, err = New(repo, nil, connect, broker, slugger, logger)
+			created, err = New(repo, nil, files, connect, broker, slugger, logger)
+			Expect(created).To(BeNil())
+			Expect(err).To(MatchError(ErrNilGigReadRepository))
+
+			created, err = New(repo, readRepo, nil, connect, broker, slugger, logger)
 			Expect(created).To(BeNil())
 			Expect(err).To(MatchError(ErrNilFileService))
 
-			created, err = New(repo, files, nil, broker, slugger, logger)
+			created, err = New(repo, readRepo, files, nil, broker, slugger, logger)
 			Expect(created).To(BeNil())
 			Expect(err).To(MatchError(ErrNilConnectStatusChecker))
 
-			created, err = New(repo, files, connect, nil, slugger, logger)
+			created, err = New(repo, readRepo, files, connect, nil, slugger, logger)
 			Expect(created).To(BeNil())
 			Expect(err).To(MatchError(ErrNilEventBroker))
 
-			created, err = New(repo, files, connect, broker, nil, logger)
+			created, err = New(repo, readRepo, files, connect, broker, nil, logger)
 			Expect(created).To(BeNil())
 			Expect(err).To(MatchError(ErrNilSlugger))
 
-			created, err = New(repo, files, connect, broker, slugger, nil)
+			created, err = New(repo, readRepo, files, connect, broker, slugger, nil)
 			Expect(created).To(BeNil())
 			Expect(err).To(MatchError(ErrNilLogger))
 		})
@@ -134,7 +140,7 @@ var _ = Describe("gigService", func() {
 
 		It("rejects an empty slug returned by the slugger", func() {
 			repo.EXPECT().GetByID(gomock.Any(), "gig-1").Return(&domain.Gig{ID: "gig-1", FreelancerID: "freelancer-1"}, nil)
-			slugger.EXPECT().Generate("Title").Return("")
+			slugger.EXPECT().Generate("Title", "gig-1").Return("")
 
 			result, err := svc.UpdateBasicInfo(ctx, "gig-1", "freelancer-1", domain.UpdateBasicInfoParams{
 				Title:       " Title ",
@@ -148,16 +154,17 @@ var _ = Describe("gigService", func() {
 
 		It("updates the repository with normalized values", func() {
 			repo.EXPECT().GetByID(gomock.Any(), "gig-1").Return(&domain.Gig{ID: "gig-1", FreelancerID: "freelancer-1"}, nil)
-			slugger.EXPECT().Generate("My Title").Return("my-title")
+			slugger.EXPECT().Generate("My Title", "gig-1").Return("my-title-gig-1")
 			repo.EXPECT().
 				UpdateBasicInfo(gomock.Any(), "gig-1", domain.UpdateBasicInfoParams{
 					Title:       "My Title",
-					Slug:        "my-title",
+					Slug:        "my-title-gig-1",
 					Description: "desc",
 					CategoryID:  1001,
 					Currency:    "usd",
 				}).
 				Return(&domain.Gig{ID: "gig-1"}, nil)
+			broker.EXPECT().Publish(gomock.Any(), gigProjectionRequestedSubject, gomock.AssignableToTypeOf([]byte{})).Return(nil)
 
 			result, err := svc.UpdateBasicInfo(ctx, "gig-1", "freelancer-1", domain.UpdateBasicInfoParams{
 				Title:       " My Title ",
@@ -171,7 +178,7 @@ var _ = Describe("gigService", func() {
 
 		It("returns repository failures", func() {
 			repo.EXPECT().GetByID(gomock.Any(), "gig-1").Return(&domain.Gig{ID: "gig-1", FreelancerID: "freelancer-1"}, nil)
-			slugger.EXPECT().Generate("Title").Return("title")
+			slugger.EXPECT().Generate("Title", "gig-1").Return("title-gig-1")
 			repo.EXPECT().
 				UpdateBasicInfo(gomock.Any(), gomock.Any(), gomock.Any()).
 				Return(nil, errors.New("update failed"))
@@ -223,6 +230,7 @@ var _ = Describe("gigService", func() {
 					},
 				}).
 				Return(&domain.Gig{ID: "gig-1"}, nil)
+			broker.EXPECT().Publish(gomock.Any(), gigProjectionRequestedSubject, gomock.AssignableToTypeOf([]byte{})).Return(nil)
 
 			result, err := svc.ReplacePackages(ctx, "gig-1", "freelancer-1", domain.ReplacePackagesParams{
 				Packages: []domain.GigPackage{
@@ -254,6 +262,7 @@ var _ = Describe("gigService", func() {
 					Questions: []domain.GigQuestion{{Content: "question one"}, {Content: "question two"}},
 				}).
 				Return(&domain.Gig{ID: "gig-1"}, nil)
+			broker.EXPECT().Publish(gomock.Any(), gigProjectionRequestedSubject, gomock.AssignableToTypeOf([]byte{})).Return(nil)
 
 			result, err := svc.ReplaceQuestions(ctx, "gig-1", "freelancer-1", domain.ReplaceQuestionsParams{
 				Questions: []domain.GigQuestion{{Content: "question one"}, {Content: "question two"}},
@@ -311,6 +320,7 @@ var _ = Describe("gigService", func() {
 					Media:         []domain.GigMedia{{GigID: "gig-1", FileID: "gallery-file", SortOrder: 1}},
 				}).
 				Return(&domain.Gig{ID: "gig-1"}, nil)
+			broker.EXPECT().Publish(gomock.Any(), gigProjectionRequestedSubject, gomock.AssignableToTypeOf([]byte{})).Return(nil)
 
 			result, err := svc.ReplaceMedia(ctx, "gig-1", "freelancer-1", domain.ReplaceMediaUploadParams{
 				Files: []domain.MediaUpload{
@@ -410,6 +420,7 @@ var _ = Describe("gigService", func() {
 					Expect(parsed.Media[0].FileID).To(Equal("gallery-file"))
 					return nil
 				})
+			broker.EXPECT().Publish(gomock.Any(), gigProjectionRequestedSubject, gomock.AssignableToTypeOf([]byte{})).Return(nil)
 
 			result, err := svc.Publish(ctx, "gig-1", "freelancer-1")
 			Expect(err).NotTo(HaveOccurred())
@@ -447,6 +458,53 @@ var _ = Describe("gigService", func() {
 		})
 	})
 
+	Describe("Project", func() {
+		It("loads all public urls in a single batch", func() {
+			gig := &domain.Gig{
+				ID:                    "gig-1",
+				PictureFileID:         "cover-file",
+				Media:                 []domain.GigMedia{{GigID: "gig-1", FileID: "gallery-1", SortOrder: 1}, {GigID: "gig-1", FileID: "cover-file", SortOrder: 2}},
+				PictureURL:            "",
+				MediaCompleted:        true,
+				RequirementsCompleted: true,
+				PackagesCompleted:     true,
+				BasicInfoCompleted:    true,
+			}
+
+			files.EXPECT().
+				GetFileURLs(gomock.Any(), []string{"cover-file", "gallery-1"}).
+				Return(map[string]string{
+					"cover-file": "https://public.local/cover-file",
+					"gallery-1":  "https://public.local/gallery-1",
+				}, nil)
+
+			projected, err := svc.Project(ctx, gig)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(projected.PictureURL).To(Equal("https://public.local/cover-file"))
+			Expect(projected.Media).To(HaveLen(2))
+			Expect(projected.Media[0].URL).To(Equal("https://public.local/gallery-1"))
+			Expect(projected.Media[1].URL).To(Equal("https://public.local/cover-file"))
+		})
+
+		It("ignores file-service failures when projecting public urls", func() {
+			gig := &domain.Gig{
+				ID:            "gig-1",
+				PictureFileID: "cover-file",
+				Media:         []domain.GigMedia{{GigID: "gig-1", FileID: "gallery-1", SortOrder: 1}},
+			}
+
+			files.EXPECT().
+				GetFileURLs(gomock.Any(), []string{"cover-file", "gallery-1"}).
+				Return(nil, errors.New("file-service down"))
+
+			projected, err := svc.Project(ctx, gig)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(projected.PictureURL).To(BeEmpty())
+			Expect(projected.Media).To(HaveLen(1))
+			Expect(projected.Media[0].URL).To(BeEmpty())
+		})
+	})
+
 	Describe("helper functions", func() {
 		It("builds media entries with sort order", func() {
 			media := buildGigMedia("gig-1", []string{"file-1", "file-2"})
@@ -479,7 +537,7 @@ var _ = Describe("gigService", func() {
 
 	Describe("slugger", func() {
 		It("generates slugs using the production implementation", func() {
-			Expect(NewSlugger().Generate(" Gig Title 123 ")).To(Equal("gig-title-123"))
+			Expect(NewSlugger().Generate(" Gig Title 123 ", "gig-1")).To(Equal("gig-title-123-gig-1"))
 		})
 	})
 

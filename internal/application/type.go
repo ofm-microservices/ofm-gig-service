@@ -17,6 +17,8 @@ type Logger = logging.Logger
 // FileService uploads gig media files through the file-service boundary.
 type FileService interface {
 	UploadFiles(ctx context.Context, ownerID, prefix string, files []domain.MediaUpload) ([]string, error)
+	GetFileURL(ctx context.Context, fileID string) (string, error)
+	GetFileURLs(ctx context.Context, fileIDs []string) (map[string]string, error)
 	DeleteFile(ctx context.Context, fileID string) error
 }
 
@@ -28,7 +30,7 @@ type ConnectStatusChecker interface {
 
 // Slugger turns human-readable titles into URL-safe slugs for gig storage.
 type Slugger interface {
-	Generate(title string) string
+	Generate(title, gigID string) string
 }
 
 // ConnectStatusResult carries the normalized Connect onboarding state.
@@ -48,8 +50,10 @@ type GigService interface {
 	ReplaceQuestions(ctx context.Context, gigID, freelancerID string, params domain.ReplaceQuestionsParams) (*domain.Gig, error)
 	ReplaceMedia(ctx context.Context, gigID, freelancerID string, params domain.ReplaceMediaUploadParams) (*domain.Gig, error)
 	GetByID(ctx context.Context, gigID, freelancerID string) (*domain.Gig, error)
+	GetPublicByID(ctx context.Context, gigID string) (*domain.Gig, error)
 	GetOrderStartSnapshot(ctx context.Context, gigID, packageID string) (*OrderStartSnapshot, error)
 	Publish(ctx context.Context, gigID, freelancerID string) (*domain.Gig, error)
+	Project(ctx context.Context, gig *domain.Gig) (*domain.Gig, error)
 }
 
 // OrderStartSnapshot contains the published gig and package data required by

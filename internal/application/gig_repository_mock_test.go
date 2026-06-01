@@ -184,6 +184,21 @@ func (mr *MockGigReadRepositoryMockRecorder) DeleteByID(ctx, gigID any) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteByID", reflect.TypeOf((*MockGigReadRepository)(nil).DeleteByID), ctx, gigID)
 }
 
+// GetByID mocks base method.
+func (m *MockGigReadRepository) GetByID(ctx context.Context, gigID string) (*domain.Gig, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetByID", ctx, gigID)
+	ret0, _ := ret[0].(*domain.Gig)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetByID indicates an expected call of GetByID.
+func (mr *MockGigReadRepositoryMockRecorder) GetByID(ctx, gigID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByID", reflect.TypeOf((*MockGigReadRepository)(nil).GetByID), ctx, gigID)
+}
+
 // Upsert mocks base method.
 func (m *MockGigReadRepository) Upsert(ctx context.Context, gig *domain.Gig) error {
 	m.ctrl.T.Helper()

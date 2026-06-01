@@ -21,6 +21,6 @@ var ServiceModule = fx.Options(
 )
 
 // ProvideGigService constructs the gig-service application service.
-func ProvideGigService(writeRepo domain.GigRepository, files filegrpc.FileService, connect paymentgrpc.PaymentService, broker eventbroker.EventBroker, slugger app.Slugger, lg logging.Logger) (app.GigService, error) {
-	return app.New(writeRepo, files, connect, broker, slugger, lg)
+func ProvideGigService(writeRepo domain.GigRepository, readRepo domain.GigReadRepository, files filegrpc.FileService, connect paymentgrpc.PaymentService, broker eventbroker.EventBroker, slugger app.Slugger, lg logging.Logger) (app.GigService, error) {
+	return app.New(writeRepo, readRepo, files, connect, broker, slugger, lg)
 }

@@ -90,6 +90,9 @@ func (fakeGigService) ReplaceMedia(context.Context, string, string, domain.Repla
 func (fakeGigService) GetByID(context.Context, string, string) (*domain.Gig, error) {
 	return &domain.Gig{ID: "gig-1"}, nil
 }
+func (fakeGigService) GetPublicByID(context.Context, string) (*domain.Gig, error) {
+	return &domain.Gig{ID: "gig-1"}, nil
+}
 func (fakeGigService) GetOrderStartSnapshot(context.Context, string, string) (*app.OrderStartSnapshot, error) {
 	return &app.OrderStartSnapshot{
 		GigID:              "gig-1",
@@ -107,6 +110,9 @@ func (fakeGigService) GetOrderStartSnapshot(context.Context, string, string) (*a
 	}, nil
 }
 func (fakeGigService) Publish(context.Context, string, string) (*domain.Gig, error) {
+	return &domain.Gig{ID: "gig-1"}, nil
+}
+func (fakeGigService) Project(context.Context, *domain.Gig) (*domain.Gig, error) {
 	return &domain.Gig{ID: "gig-1"}, nil
 }
 
@@ -288,7 +294,7 @@ var _ = Describe("fx providers and invokes", func() {
 		Expect(lc.hooks[0].OnStop(context.Background())).To(Succeed())
 		Expect(broker.closed).To(BeTrue())
 
-		subscriber, err := ProvideGigProjectionSubscriber(broker, &fakeProjectionWriter{}, app.NewGigEventMapper(), &config.Config{NATS: config.NATSConfig{GigEventsStream: "GIG_EVENTS", GigPublishedSubject: "gig.published"}}, lg)
+		subscriber, err := ProvideGigProjectionSubscriber(broker, fakeGigService{}, &fakeProjectionWriter{}, app.NewGigEventMapper(), &config.Config{NATS: config.NATSConfig{GigEventsStream: "GIG_EVENTS", GigPublishedSubject: "gig.published", GigProjectionSubject: "gig.projection.requested"}}, lg)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(subscriber).NotTo(BeNil())
 
@@ -335,7 +341,7 @@ var _ = Describe("fx providers and invokes", func() {
 		Expect(readRepo).To(BeNil())
 		Expect(err).To(HaveOccurred())
 
-		svc, err := ProvideGigService(nil, nil, nil, nil, nil, lg)
+		svc, err := ProvideGigService(nil, nil, nil, nil, nil, nil, lg)
 		Expect(svc).To(BeNil())
 		Expect(err).To(HaveOccurred())
 	})
