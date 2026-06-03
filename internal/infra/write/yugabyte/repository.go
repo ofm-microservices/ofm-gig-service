@@ -6,6 +6,7 @@ import (
 	"gig-service/internal/domain"
 	"gig-service/internal/infra/write/yugabyte/mapper"
 	"gig-service/internal/infra/write/yugabyte/model"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -55,8 +56,10 @@ func (r *repo) CreateDraft(ctx context.Context, params domain.CreateDraftParams)
 	if err := r.db.QueryRowContext(ctx, createGigDraftQuery, row.ID, row.FreelancerID).Scan(
 		&row.ID,
 		&row.FreelancerID,
+		&row.SellerUsername,
 		&row.Slug,
 		&row.Title,
+		&row.ShortInfo,
 		&row.Description,
 		&row.CategoryID,
 		&row.Currency,
@@ -97,11 +100,13 @@ func (r *repo) UpdateBasicInfo(ctx context.Context, gigID string, params domain.
 	}()
 
 	var row model.GigRow
-	if err := r.db.QueryRowContext(ctx, updateGigBasicInfoQuery, gigID, params.Title, params.Slug, params.Description, params.CategoryID, params.Currency).Scan(
+	if err := r.db.QueryRowContext(ctx, updateGigBasicInfoQuery, gigID, params.Title, params.ShortInfo, params.Slug, params.Description, params.CategoryID, params.Currency).Scan(
 		&row.ID,
 		&row.FreelancerID,
+		&row.SellerUsername,
 		&row.Slug,
 		&row.Title,
+		&row.ShortInfo,
 		&row.Description,
 		&row.CategoryID,
 		&row.Currency,
@@ -123,6 +128,56 @@ func (r *repo) UpdateBasicInfo(ctx context.Context, gigID string, params domain.
 			logging.DurationMS(time.Since(started)),
 			logging.String("gig_id", gigID),
 			logging.String("slug", params.Slug),
+			logging.Err(err),
+		)
+		return nil, r.translator.TranslateFindGigError(err)
+	}
+
+	gig, err := r.loadGig(ctx, gigID, row)
+	if err != nil {
+		status = "error"
+	}
+	return gig, err
+}
+
+// UpdateSellerUsername backfills the denormalized seller username on the gig
+// write model.
+func (r *repo) UpdateSellerUsername(ctx context.Context, gigID, sellerUsername string) (*domain.Gig, error) {
+	started := time.Now()
+	status := "success"
+	defer func() {
+		metrics.Global().ObserveDB("yugabyte", "update_seller_username", "gigs", status, time.Since(started))
+	}()
+
+	var row model.GigRow
+	if err := r.db.QueryRowContext(ctx, updateGigSellerUsernameQuery, gigID, sellerUsername).Scan(
+		&row.ID,
+		&row.FreelancerID,
+		&row.SellerUsername,
+		&row.Slug,
+		&row.Title,
+		&row.ShortInfo,
+		&row.Description,
+		&row.CategoryID,
+		&row.Currency,
+		&row.Status,
+		&row.BasicInfoCompleted,
+		&row.PackagesCompleted,
+		&row.RequirementsCompleted,
+		&row.MediaCompleted,
+		&row.PictureFileID,
+		&row.PublishedAt,
+		&row.CreatedAt,
+		&row.UpdatedAt,
+	); err != nil {
+		status = "error"
+		r.log.Error("update seller username failed",
+			logging.Operation("db.gig.update_seller_username"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", gigID),
+			logging.String("seller_username", sellerUsername),
 			logging.Err(err),
 		)
 		return nil, r.translator.TranslateFindGigError(err)
@@ -452,8 +507,10 @@ func (r *repo) Publish(ctx context.Context, gigID string) (*domain.Gig, error) {
 	if err := r.db.QueryRowContext(ctx, publishGigQuery, gigID).Scan(
 		&row.ID,
 		&row.FreelancerID,
+		&row.SellerUsername,
 		&row.Slug,
 		&row.Title,
+		&row.ShortInfo,
 		&row.Description,
 		&row.CategoryID,
 		&row.Currency,
@@ -501,6 +558,79 @@ func (r *repo) loadGig(ctx context.Context, gigID string, row model.GigRow) (*do
 	}
 
 	return mapper.MapGigRowToDomain(row, packages, questions, media), nil
+}
+
+// ListAll loads every gig owned by the service for bootstrap and maintenance
+// jobs.
+func (r *repo) ListAll(ctx context.Context) ([]*domain.Gig, error) {
+	started := time.Now()
+	status := "success"
+	defer func() { metrics.Global().ObserveDB("yugabyte", "list_all", "gigs", status, time.Since(started)) }()
+
+	var rows []model.GigRow
+	if err := r.db.SelectContext(ctx, &rows, listAllGigsQuery); err != nil {
+		status = "error"
+		r.log.Error("list all gigs failed",
+			logging.Operation("db.gig.list_all"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.Err(err),
+		)
+		return nil, r.translator.TranslateFindGigError(err)
+	}
+
+	out := make([]*domain.Gig, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, mapper.MapGigRowToDomain(row, nil, nil, nil))
+	}
+	return out, nil
+}
+
+// ListPublishedBySellerUsername loads the published gigs for one freelancer
+// username.
+func (r *repo) ListPublishedBySellerUsername(ctx context.Context, query domain.ListPreviewGigsQuery) ([]*domain.Gig, error) {
+	started := time.Now()
+	status := "success"
+	defer func() {
+		metrics.Global().ObserveDB("yugabyte", "list_by_seller_username", "gigs", status, time.Since(started))
+	}()
+
+	username := strings.TrimSpace(query.SellerUsername)
+	if username == "" {
+		return nil, domain.ErrInvalidUsername
+	}
+
+	var rows []model.GigRow
+	if err := r.db.SelectContext(ctx, &rows, listPublishedBySellerUsernameQuery, username); err != nil {
+		status = "error"
+		r.log.Error("list published gigs by seller username failed",
+			logging.Operation("db.gig.list_published_by_seller_username"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("seller_username", username),
+			logging.Err(err),
+		)
+		return nil, r.translator.TranslateFindGigError(err)
+	}
+
+	limit := query.Limit
+	if limit <= 0 || limit > len(rows) {
+		limit = len(rows)
+	}
+	out := make([]*domain.Gig, 0, limit)
+	for i := 0; i < limit; i++ {
+		row := rows[i]
+		gig, err := r.loadGig(ctx, row.ID, row)
+		if err != nil {
+			status = "error"
+			return nil, err
+		}
+		out = append(out, gig)
+	}
+
+	return out, nil
 }
 
 func (r *repo) loadPackages(ctx context.Context, gigID string) ([]model.GigPackageRow, error) {

@@ -3,9 +3,9 @@ package main
 import (
 	"testing"
 
-	"go.uber.org/fx"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"go.uber.org/fx"
 )
 
 func TestMainCmd(t *testing.T) {

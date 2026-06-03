@@ -16,6 +16,12 @@ type GigProjectionSubscriber interface {
 	Subscribe(ctx context.Context) error
 }
 
+// GigPreviewProjectionSubscriber consumes publish-time preview projection
+// events from NATS and appends them to the freelancer preview windows.
+type GigPreviewProjectionSubscriber interface {
+	Subscribe(ctx context.Context) error
+}
+
 // ProjectionWriter stores projected gig read models.
 type ProjectionWriter interface {
 	Upsert(ctx context.Context, gig *domain.Gig) error

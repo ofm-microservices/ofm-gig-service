@@ -1,0 +1,2 @@
+ALTER TABLE gigs DROP COLUMN IF EXISTS short_info;
+ALTER TABLE gigs DROP COLUMN IF EXISTS seller_username;

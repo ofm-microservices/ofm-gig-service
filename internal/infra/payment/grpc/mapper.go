@@ -2,12 +2,12 @@ package grpc
 
 import (
 	"errors"
-	"strings"
 	app "gig-service/internal/application"
 	"gig-service/internal/domain"
 	paymentconnectv1 "github.com/ofm-microservices/ofm-common/proto/paymentconnect/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"strings"
 )
 
 type paymentMapper struct{}

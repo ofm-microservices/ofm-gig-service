@@ -30,6 +30,13 @@ var _ = Describe("Config", func() {
 		GinkgoT().Setenv("NATS_URL", "nats://127.0.0.1:4222")
 		GinkgoT().Setenv("FILE_SERVICE_ADDRESS", "127.0.0.1:9504")
 		GinkgoT().Setenv("PAYMENT_SERVICE_ADDRESS", "127.0.0.1:9505")
+		GinkgoT().Setenv("USER_SERVICE_ADDRESS", "127.0.0.1:9506")
+		GinkgoT().Setenv("CLICKHOUSE_ENDPOINT", "http://127.0.0.1:8123")
+		GinkgoT().Setenv("CLICKHOUSE_USER", "admin")
+		GinkgoT().Setenv("CLICKHOUSE_PASSWORD", "admin")
+		GinkgoT().Setenv("GIG_PREVIEW_PAGE_SIZE", "1")
+		GinkgoT().Setenv("GIG_PREVIEW_WINDOW_SIZE", "2")
+		GinkgoT().Setenv("GIG_PREVIEW_WINDOW_TTL", "15m")
 
 		cfg, err := Load()
 
@@ -40,6 +47,8 @@ var _ = Describe("Config", func() {
 		Expect(cfg.GRPC.Port).To(Equal(9503))
 		Expect(cfg.Redis.Port).To(Equal(6380))
 		Expect(cfg.FileService.Address).To(Equal("127.0.0.1:9504"))
+		Expect(cfg.Preview.PageSize).To(Equal(1))
+		Expect(cfg.Preview.WindowSize).To(Equal(2))
 	})
 
 	It("wraps parsing errors", func() {
@@ -57,6 +66,13 @@ var _ = Describe("Config", func() {
 		GinkgoT().Setenv("NATS_URL", "nats://127.0.0.1:4222")
 		GinkgoT().Setenv("FILE_SERVICE_ADDRESS", "127.0.0.1:9504")
 		GinkgoT().Setenv("PAYMENT_SERVICE_ADDRESS", "127.0.0.1:9505")
+		GinkgoT().Setenv("USER_SERVICE_ADDRESS", "127.0.0.1:9506")
+		GinkgoT().Setenv("CLICKHOUSE_ENDPOINT", "http://127.0.0.1:8123")
+		GinkgoT().Setenv("CLICKHOUSE_USER", "admin")
+		GinkgoT().Setenv("CLICKHOUSE_PASSWORD", "admin")
+		GinkgoT().Setenv("GIG_PREVIEW_PAGE_SIZE", "1")
+		GinkgoT().Setenv("GIG_PREVIEW_WINDOW_SIZE", "2")
+		GinkgoT().Setenv("GIG_PREVIEW_WINDOW_TTL", "15m")
 
 		cfg, err := Load()
 

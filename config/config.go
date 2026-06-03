@@ -10,12 +10,15 @@ type Config struct {
 	App            AppConfig
 	DB             DBConfig
 	GRPC           GRPCConfig
+	Preview        PreviewPaginationConfig
 	Metrics        MetricsConfig
 	Tracing        TracingConfig
 	Redis          RedisConfig
 	NATS           NATSConfig
 	FileService    FileServiceConfig
 	PaymentService PaymentServiceConfig
+	UserService    UserServiceConfig
+	ClickHouse     ClickHouseConfig
 }
 
 // Load reads environment variables into Config and applies defaults.
@@ -25,6 +28,9 @@ func Load() (*Config, error) {
 	cfg := &Config{}
 	if err := env.Parse(cfg); err != nil {
 		return nil, WrapParseEnvConfigError(err)
+	}
+	if err := validatePreviewPaginationConfig(cfg.Preview); err != nil {
+		return nil, err
 	}
 
 	return cfg, nil

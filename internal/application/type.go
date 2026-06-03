@@ -42,6 +42,30 @@ type ConnectStatusResult struct {
 	OccurredAt      string
 }
 
+// UserPreview carries the compact user identity used to backfill seller
+// usernames in gig-service.
+type UserPreview struct {
+	UserID      string
+	Username    string
+	DisplayName string
+	AvatarID    string
+	AvatarURL   string
+}
+
+// PopularityRow carries the aggregated analytics used to rebuild popularity
+// snapshots from ClickHouse.
+type PopularityRow struct {
+	GigID                  string `json:"gig_id"`
+	CompletedOrdersLast30d int64  `json:"completed_orders_last_30d"`
+	ReviewsCountLast30d    int64  `json:"reviews_count_last_30d"`
+	ViewsLast7d            int64  `json:"views_last_7d"`
+}
+
+// PopularitySource queries the analytics store for popularity aggregates.
+type PopularitySource interface {
+	ListPopularityRows(ctx context.Context) ([]PopularityRow, error)
+}
+
 // GigService owns gig draft creation, draft updates, and publication.
 type GigService interface {
 	CreateDraft(ctx context.Context, freelancerID string) (*domain.Gig, error)
@@ -51,8 +75,13 @@ type GigService interface {
 	ReplaceMedia(ctx context.Context, gigID, freelancerID string, params domain.ReplaceMediaUploadParams) (*domain.Gig, error)
 	GetByID(ctx context.Context, gigID, freelancerID string) (*domain.Gig, error)
 	GetPublicByID(ctx context.Context, gigID string) (*domain.Gig, error)
+	GetPreviewGigsByFreelancerUsername(ctx context.Context, query domain.ListPreviewGigsQuery) (*domain.ListPreviewGigsResult, error)
+	// AppendPreviewGig seeds the freelancer preview cache with a published gig
+	// using the current preview window policy.
+	AppendPreviewGig(ctx context.Context, gig *domain.Gig) error
+	RebuildPopularitySnapshots(ctx context.Context, gigs []*domain.Gig) error
 	GetOrderStartSnapshot(ctx context.Context, gigID, packageID string) (*OrderStartSnapshot, error)
-	Publish(ctx context.Context, gigID, freelancerID string) (*domain.Gig, error)
+	Publish(ctx context.Context, gigID, freelancerID, username string) (*domain.Gig, error)
 	Project(ctx context.Context, gig *domain.Gig) (*domain.Gig, error)
 }
 
@@ -62,6 +91,7 @@ type OrderStartSnapshot struct {
 	GigID              string
 	PackageID          string
 	SellerID           string
+	SellerUsername     string
 	GigTitle           string
 	PackageTitle       string
 	PackageDescription string

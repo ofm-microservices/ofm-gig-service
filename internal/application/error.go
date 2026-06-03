@@ -13,8 +13,12 @@ var (
 	ErrNilConnectStatusChecker = errors.New("connect status checker is nil")
 	// ErrNilEventBroker reports that the event broker dependency was not provided.
 	ErrNilEventBroker = errors.New("event broker is nil")
+	// ErrNilPopularitySource reports that the popularity analytics dependency was not provided.
+	ErrNilPopularitySource = errors.New("popularity source is nil")
 	// ErrNilSlugger reports that the slugger dependency was not provided.
 	ErrNilSlugger = errors.New("slugger is nil")
 	// ErrNilLogger reports that the logger dependency was not provided.
 	ErrNilLogger = errors.New("logger is nil")
+	// ErrInvalidPreviewConfig reports that the preview pagination configuration is invalid.
+	ErrInvalidPreviewConfig = errors.New("preview pagination config is invalid")
 )

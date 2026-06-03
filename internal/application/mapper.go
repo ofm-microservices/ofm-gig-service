@@ -9,12 +9,15 @@ import (
 const (
 	gigPublishedSubject           = "gig.published"
 	gigProjectionRequestedSubject = "gig.projection.requested"
+	gigPreviewProjectionSubject   = "gig.preview.projection.requested"
+	gigViewedSubject              = "gig.viewed"
 )
 
 // GigEventMapper builds outbound event payloads for publication.
 type GigEventMapper interface {
 	FromPublishedPayload(payload []byte) (*domain.Gig, error)
 	ToPublishedPayload(gig *domain.Gig) ([]byte, error)
+	ToViewedPayload(gig *domain.Gig) ([]byte, error)
 	FromReadModelPayload(payload []byte) (*domain.Gig, error)
 	ToReadModelPayload(gig *domain.Gig) ([]byte, error)
 }
@@ -31,8 +34,10 @@ func (m *gigEventMapper) ToPublishedPayload(gig *domain.Gig) ([]byte, error) {
 	payload := GigPublishedEvent{
 		GigID:                 gig.ID,
 		FreelancerID:          gig.FreelancerID,
+		SellerUsername:        gig.SellerUsername,
 		Slug:                  gig.Slug,
 		Title:                 gig.Title,
+		ShortInfo:             gig.ShortInfo,
 		Description:           gig.Description,
 		CategoryID:            gig.CategoryID,
 		Currency:              gig.Currency,
@@ -91,20 +96,44 @@ func (m *gigEventMapper) ToPublishedPayload(gig *domain.Gig) ([]byte, error) {
 	return json.Marshal(payload)
 }
 
+// GigViewedEvent captures a successful public gig view for analytics and
+// popularity ranking.
+type GigViewedEvent struct {
+	GigID          string    `json:"gig_id"`
+	FreelancerID   string    `json:"freelancer_id"`
+	SellerUsername string    `json:"seller_username"`
+	Slug           string    `json:"slug"`
+	ViewedAt       time.Time `json:"viewed_at"`
+}
+
+func (m *gigEventMapper) ToViewedPayload(gig *domain.Gig) ([]byte, error) {
+	payload := GigViewedEvent{
+		GigID:          gig.ID,
+		FreelancerID:   gig.FreelancerID,
+		SellerUsername: gig.SellerUsername,
+		Slug:           gig.Slug,
+		ViewedAt:       time.Now().UTC(),
+	}
+
+	return json.Marshal(payload)
+}
+
 func (m *gigEventMapper) ToReadModelPayload(gig *domain.Gig) ([]byte, error) {
 	payload := GigReadModelEvent{
-		GigID:         gig.ID,
-		FreelancerID:  gig.FreelancerID,
-		Slug:          gig.Slug,
-		Title:         gig.Title,
-		Description:   gig.Description,
-		CategoryID:    gig.CategoryID,
-		Currency:      gig.Currency,
-		PictureFileID: gig.PictureFileID,
-		PictureURL:    gig.PictureURL,
-		PublishedAt:   gig.PublishedAt,
-		CreatedAt:     gig.CreatedAt,
-		UpdatedAt:     gig.UpdatedAt,
+		GigID:          gig.ID,
+		FreelancerID:   gig.FreelancerID,
+		SellerUsername: gig.SellerUsername,
+		Slug:           gig.Slug,
+		Title:          gig.Title,
+		ShortInfo:      gig.ShortInfo,
+		Description:    gig.Description,
+		CategoryID:     gig.CategoryID,
+		Currency:       gig.Currency,
+		PictureFileID:  gig.PictureFileID,
+		PictureURL:     gig.PictureURL,
+		PublishedAt:    gig.PublishedAt,
+		CreatedAt:      gig.CreatedAt,
+		UpdatedAt:      gig.UpdatedAt,
 	}
 
 	if len(gig.Packages) > 0 {
@@ -146,8 +175,10 @@ func (m *gigEventMapper) FromPublishedPayload(payload []byte) (*domain.Gig, erro
 	gig := &domain.Gig{
 		ID:                    event.GigID,
 		FreelancerID:          event.FreelancerID,
+		SellerUsername:        event.SellerUsername,
 		Slug:                  event.Slug,
 		Title:                 event.Title,
+		ShortInfo:             event.ShortInfo,
 		Description:           event.Description,
 		CategoryID:            event.CategoryID,
 		Currency:              event.Currency,
@@ -212,18 +243,20 @@ func (m *gigEventMapper) FromReadModelPayload(payload []byte) (*domain.Gig, erro
 	}
 
 	gig := &domain.Gig{
-		ID:            event.GigID,
-		FreelancerID:  event.FreelancerID,
-		Slug:          event.Slug,
-		Title:         event.Title,
-		Description:   event.Description,
-		CategoryID:    event.CategoryID,
-		Currency:      event.Currency,
-		PictureFileID: event.PictureFileID,
-		PictureURL:    event.PictureURL,
-		PublishedAt:   event.PublishedAt,
-		CreatedAt:     event.CreatedAt,
-		UpdatedAt:     event.UpdatedAt,
+		ID:             event.GigID,
+		FreelancerID:   event.FreelancerID,
+		SellerUsername: event.SellerUsername,
+		Slug:           event.Slug,
+		Title:          event.Title,
+		ShortInfo:      event.ShortInfo,
+		Description:    event.Description,
+		CategoryID:     event.CategoryID,
+		Currency:       event.Currency,
+		PictureFileID:  event.PictureFileID,
+		PictureURL:     event.PictureURL,
+		PublishedAt:    event.PublishedAt,
+		CreatedAt:      event.CreatedAt,
+		UpdatedAt:      event.UpdatedAt,
 	}
 
 	if len(event.Packages) > 0 {
@@ -261,8 +294,10 @@ func (m *gigEventMapper) FromReadModelPayload(payload []byte) (*domain.Gig, erro
 type GigPublishedEvent struct {
 	GigID                 string                 `json:"gig_id"`
 	FreelancerID          string                 `json:"freelancer_id"`
+	SellerUsername        string                 `json:"seller_username"`
 	Slug                  string                 `json:"slug"`
 	Title                 string                 `json:"title"`
+	ShortInfo             string                 `json:"short_info"`
 	Description           string                 `json:"description"`
 	CategoryID            int64                  `json:"category_id"`
 	Currency              string                 `json:"currency"`
@@ -283,20 +318,22 @@ type GigPublishedEvent struct {
 
 // GigReadModelEvent is the JSON payload stored in Redis for public gig reads.
 type GigReadModelEvent struct {
-	GigID         string                `json:"gig_id"`
-	FreelancerID  string                `json:"freelancer_id"`
-	Slug          string                `json:"slug"`
-	Title         string                `json:"title"`
-	Description   string                `json:"description"`
-	CategoryID    int64                 `json:"category_id"`
-	Currency      string                `json:"currency"`
-	PictureFileID string                `json:"picture_file_id"`
-	PictureURL    string                `json:"picture_url,omitempty"`
-	PublishedAt   *time.Time            `json:"published_at,omitempty"`
-	CreatedAt     time.Time             `json:"created_at"`
-	UpdatedAt     time.Time             `json:"updated_at"`
-	Packages      []GigReadModelPackage `json:"packages"`
-	Media         []GigReadModelMedia   `json:"media"`
+	GigID          string                `json:"gig_id"`
+	FreelancerID   string                `json:"freelancer_id"`
+	SellerUsername string                `json:"seller_username"`
+	Slug           string                `json:"slug"`
+	Title          string                `json:"title"`
+	ShortInfo      string                `json:"short_info"`
+	Description    string                `json:"description"`
+	CategoryID     int64                 `json:"category_id"`
+	Currency       string                `json:"currency"`
+	PictureFileID  string                `json:"picture_file_id"`
+	PictureURL     string                `json:"picture_url,omitempty"`
+	PublishedAt    *time.Time            `json:"published_at,omitempty"`
+	CreatedAt      time.Time             `json:"created_at"`
+	UpdatedAt      time.Time             `json:"updated_at"`
+	Packages       []GigReadModelPackage `json:"packages"`
+	Media          []GigReadModelMedia   `json:"media"`
 }
 
 // GigReadModelPackage describes one package embedded in the public gig cache.

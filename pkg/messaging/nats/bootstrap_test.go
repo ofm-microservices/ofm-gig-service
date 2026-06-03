@@ -19,9 +19,9 @@ func (f fakeBootstrapConn) JetStream() (jetStreamManager, error) { return f.js, 
 func (fakeBootstrapConn) Close()                                 {}
 
 type fakeJetStream struct {
-	addErr    error
-	updateErr error
-	addCalls  int
+	addErr      error
+	updateErr   error
+	addCalls    int
 	updateCalls int
 }
 
@@ -69,10 +69,12 @@ var _ = Describe("nats bootstrap", func() {
 		}
 
 		Expect(EnsureStream(config.NATSConfig{
-			URL:                 "nats://unused",
-			GigEventsStream:     "GIG_EVENTS",
-			GigPublishedSubject: "gig.published",
-			GigProjectionSubject:"gig.projection.requested",
+			URL:                         "nats://unused",
+			GigEventsStream:             "GIG_EVENTS",
+			GigPublishedSubject:         "gig.published",
+			GigProjectionSubject:        "gig.projection.requested",
+			GigPreviewProjectionSubject: "gig.preview.projection.requested",
+			GigViewedSubject:            "gig.viewed",
 		}, logger)).To(Succeed())
 		Expect(js.addCalls).To(Equal(1))
 
@@ -81,10 +83,12 @@ var _ = Describe("nats bootstrap", func() {
 			return fakeBootstrapConn{js: js}, nil
 		}
 		Expect(EnsureStream(config.NATSConfig{
-			URL:                 "nats://unused",
-			GigEventsStream:     "GIG_EVENTS",
-			GigPublishedSubject: "gig.published",
-			GigProjectionSubject:"gig.projection.requested",
+			URL:                         "nats://unused",
+			GigEventsStream:             "GIG_EVENTS",
+			GigPublishedSubject:         "gig.published",
+			GigProjectionSubject:        "gig.projection.requested",
+			GigPreviewProjectionSubject: "gig.preview.projection.requested",
+			GigViewedSubject:            "gig.viewed",
 		}, logger)).To(MatchError(ContainSubstring("ensure stream")))
 
 		connectBootstrap = func(config.NATSConfig) (bootstrapConn, error) {

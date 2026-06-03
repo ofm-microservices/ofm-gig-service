@@ -269,6 +269,64 @@ func (mr *MockGigServiceMockRecorder) GetByID(ctx, gigID, freelancerID any) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByID", reflect.TypeOf((*MockGigService)(nil).GetByID), ctx, gigID, freelancerID)
 }
 
+// GetOrderStartSnapshot mocks base method.
+func (m *MockGigService) GetOrderStartSnapshot(ctx context.Context, gigID, packageID string) (*OrderStartSnapshot, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetOrderStartSnapshot", ctx, gigID, packageID)
+	ret0, _ := ret[0].(*OrderStartSnapshot)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetOrderStartSnapshot indicates an expected call of GetOrderStartSnapshot.
+func (mr *MockGigServiceMockRecorder) GetOrderStartSnapshot(ctx, gigID, packageID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOrderStartSnapshot", reflect.TypeOf((*MockGigService)(nil).GetOrderStartSnapshot), ctx, gigID, packageID)
+}
+
+// GetPreviewGigsByFreelancerUsername mocks base method.
+func (m *MockGigService) GetPreviewGigsByFreelancerUsername(ctx context.Context, query domain.ListPreviewGigsQuery) (*domain.ListPreviewGigsResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPreviewGigsByFreelancerUsername", ctx, query)
+	ret0, _ := ret[0].(*domain.ListPreviewGigsResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPreviewGigsByFreelancerUsername indicates an expected call of GetPreviewGigsByFreelancerUsername.
+func (mr *MockGigServiceMockRecorder) GetPreviewGigsByFreelancerUsername(ctx, query any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPreviewGigsByFreelancerUsername", reflect.TypeOf((*MockGigService)(nil).GetPreviewGigsByFreelancerUsername), ctx, query)
+}
+
+// AppendPreviewGig mocks base method.
+func (m *MockGigService) AppendPreviewGig(ctx context.Context, gig *domain.Gig) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AppendPreviewGig", ctx, gig)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AppendPreviewGig indicates an expected call of AppendPreviewGig.
+func (mr *MockGigServiceMockRecorder) AppendPreviewGig(ctx, gig any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppendPreviewGig", reflect.TypeOf((*MockGigService)(nil).AppendPreviewGig), ctx, gig)
+}
+
+// RebuildPopularitySnapshots mocks base method.
+func (m *MockGigService) RebuildPopularitySnapshots(ctx context.Context, gigs []*domain.Gig) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RebuildPopularitySnapshots", ctx, gigs)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RebuildPopularitySnapshots indicates an expected call of RebuildPopularitySnapshots.
+func (mr *MockGigServiceMockRecorder) RebuildPopularitySnapshots(ctx, gigs any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RebuildPopularitySnapshots", reflect.TypeOf((*MockGigService)(nil).RebuildPopularitySnapshots), ctx, gigs)
+}
+
 // GetPublicByID mocks base method.
 func (m *MockGigService) GetPublicByID(ctx context.Context, gigID string) (*domain.Gig, error) {
 	m.ctrl.T.Helper()
@@ -299,34 +357,19 @@ func (mr *MockGigServiceMockRecorder) Project(ctx, gig any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Project", reflect.TypeOf((*MockGigService)(nil).Project), ctx, gig)
 }
 
-// GetOrderStartSnapshot mocks base method.
-func (m *MockGigService) GetOrderStartSnapshot(ctx context.Context, gigID, packageID string) (*OrderStartSnapshot, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetOrderStartSnapshot", ctx, gigID, packageID)
-	ret0, _ := ret[0].(*OrderStartSnapshot)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetOrderStartSnapshot indicates an expected call of GetOrderStartSnapshot.
-func (mr *MockGigServiceMockRecorder) GetOrderStartSnapshot(ctx, gigID, packageID any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOrderStartSnapshot", reflect.TypeOf((*MockGigService)(nil).GetOrderStartSnapshot), ctx, gigID, packageID)
-}
-
 // Publish mocks base method.
-func (m *MockGigService) Publish(ctx context.Context, gigID, freelancerID string) (*domain.Gig, error) {
+func (m *MockGigService) Publish(ctx context.Context, gigID, freelancerID, username string) (*domain.Gig, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Publish", ctx, gigID, freelancerID)
+	ret := m.ctrl.Call(m, "Publish", ctx, gigID, freelancerID, username)
 	ret0, _ := ret[0].(*domain.Gig)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Publish indicates an expected call of Publish.
-func (mr *MockGigServiceMockRecorder) Publish(ctx, gigID, freelancerID any) *gomock.Call {
+func (mr *MockGigServiceMockRecorder) Publish(ctx, gigID, freelancerID, username any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Publish", reflect.TypeOf((*MockGigService)(nil).Publish), ctx, gigID, freelancerID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Publish", reflect.TypeOf((*MockGigService)(nil).Publish), ctx, gigID, freelancerID, username)
 }
 
 // ReplaceMedia mocks base method.

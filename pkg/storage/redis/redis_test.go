@@ -5,8 +5,8 @@ import (
 	"errors"
 	"strconv"
 
-	"github.com/alicebob/miniredis/v2"
 	"gig-service/config"
+	"github.com/alicebob/miniredis/v2"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

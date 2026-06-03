@@ -9,11 +9,14 @@ type NATSConfig struct {
 	User     string `env:"NATS_USER"`
 	Password string `env:"NATS_PASSWORD"`
 
-	GigEventsStream     string `env:"NATS_STREAM_GIG_EVENTS" envDefault:"GIG_EVENTS"`
-	GigPublishedSubject string `env:"NATS_SUBJECT_GIG_PUBLISHED" envDefault:"gig.published"`
+	GigEventsStream      string `env:"NATS_STREAM_GIG_EVENTS" envDefault:"GIG_EVENTS"`
+	GigPublishedSubject  string `env:"NATS_SUBJECT_GIG_PUBLISHED" envDefault:"gig.published"`
 	GigProjectionSubject string `env:"NATS_SUBJECT_GIG_PROJECTION" envDefault:"gig.projection.requested"`
+	GigPreviewProjectionSubject string `env:"NATS_SUBJECT_GIG_PREVIEW_PROJECTION" envDefault:"gig.preview.projection.requested"`
+	GigViewedSubject     string `env:"NATS_SUBJECT_GIG_VIEWED" envDefault:"gig.viewed"`
 
 	GigProjectionDurable                 string        `env:"NATS_DURABLE_GIG_PROJECTION" envDefault:"gig_service_gig_projection"`
+	GigPreviewProjectionDurable          string        `env:"NATS_DURABLE_GIG_PREVIEW_PROJECTION" envDefault:"gig_service_gig_preview_projection"`
 	GigProjectionBatchSize               int           `env:"NATS_GIG_PROJECTION_BATCH_SIZE" envDefault:"100"`
 	GigProjectionMaxWait                 time.Duration `env:"NATS_GIG_PROJECTION_MAX_WAIT" envDefault:"500ms"`
 	GigProjectionWorkers                 int           `env:"NATS_GIG_PROJECTION_WORKERS" envDefault:"4"`
