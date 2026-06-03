@@ -6,8 +6,10 @@ import "time"
 type GigRow struct {
 	ID                    string     `db:"gig_id"`
 	FreelancerID          string     `db:"freelancer_id"`
+	SellerUsername        string     `db:"seller_username"`
 	Slug                  string     `db:"slug"`
 	Title                 string     `db:"title"`
+	ShortInfo             string     `db:"short_info"`
 	Description           string     `db:"description"`
 	CategoryID            int64      `db:"category_id"`
 	Currency              string     `db:"currency"`

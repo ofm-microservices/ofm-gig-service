@@ -7,6 +7,7 @@ import (
 	"gig-service/internal/domain"
 	"net"
 	"strings"
+	"sync"
 
 	"github.com/google/uuid"
 	"github.com/ofm-microservices/ofm-common/pkg/logging"
@@ -25,6 +26,8 @@ type server struct {
 	mapr     GigMapper
 	srv      *grpc.Server
 	listener net.Listener
+	started  chan struct{}
+	once     sync.Once
 }
 
 // NewServer constructs the gig-service gRPC draft workflow server.
@@ -46,6 +49,7 @@ func NewServer(svc GigService, cfg config.GRPCConfig, log logging.Logger) (Serve
 		mapr: newGigMapper(log.With(logging.String("module", "grpc-mapper"))),
 		log:  log.With(logging.String("module", "grpc-server")),
 		srv:  grpcSrv,
+		started: make(chan struct{}),
 	}
 	gigv1.RegisterGigCommandServiceServer(grpcSrv, s)
 	return s, nil
@@ -60,6 +64,9 @@ func (s *server) Start() error {
 	}
 
 	s.listener = lis
+	s.once.Do(func() {
+		close(s.started)
+	})
 	s.log.Info("starting grpc server", logging.String("addr", addr))
 	return s.srv.Serve(lis)
 }
@@ -257,11 +264,35 @@ func (s *server) GetGigBySlug(ctx context.Context, req *gigv1.GetGigBySlugReques
 	return s.mapr.ToGetGigBySlugResponse(gig), nil
 }
 
+// GetPreviewGigsByFreelancerUsername returns the freelancer profile gig preview list.
+func (s *server) GetPreviewGigsByFreelancerUsername(ctx context.Context, req *gigv1.GetPreviewGigsByFreelancerUsernameRequest) (*gigv1.GetPreviewGigsByFreelancerUsernameResponse, error) {
+	started := time.Now()
+	log := logging.WithContext(ctx, s.log)
+	result, err := s.svc.GetPreviewGigsByFreelancerUsername(ctx, domain.ListPreviewGigsQuery{
+		SellerUsername: req.GetUsername(),
+		Cursor:         req.GetCursor(),
+		Limit:          0,
+	})
+	if err != nil {
+		log.Error("get preview gigs by freelancer username failed",
+			logging.Operation("grpc.gig.get_preview_by_username"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("username", req.GetUsername()),
+			logging.Err(err),
+		)
+		return nil, s.mapr.ToError(err)
+	}
+
+	return s.mapr.ToGetPreviewGigsByFreelancerUsernameResponse(result), nil
+}
+
 // Publish makes the gig visible and emits the published event.
 func (s *server) Publish(ctx context.Context, req *gigv1.PublishRequest) (*gigv1.PublishResponse, error) {
 	started := time.Now()
 	log := logging.WithContext(ctx, s.log)
-	gig, err := s.svc.Publish(ctx, req.GetGigId(), req.GetFreelancerId())
+	gig, err := s.svc.Publish(ctx, req.GetGigId(), req.GetFreelancerId(), req.GetUsername())
 	if err != nil {
 		log.Error("publish failed",
 			logging.Operation("grpc.gig.publish"),
@@ -270,6 +301,7 @@ func (s *server) Publish(ctx context.Context, req *gigv1.PublishRequest) (*gigv1
 			logging.DurationMS(time.Since(started)),
 			logging.String("gig_id", req.GetGigId()),
 			logging.String("freelancer_id", req.GetFreelancerId()),
+			logging.String("username", req.GetUsername()),
 			logging.Err(err),
 		)
 		return nil, s.mapr.ToError(err)

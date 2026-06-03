@@ -93,6 +93,15 @@ func (fakeGigService) GetByID(context.Context, string, string) (*domain.Gig, err
 func (fakeGigService) GetPublicByID(context.Context, string) (*domain.Gig, error) {
 	return &domain.Gig{ID: "gig-1"}, nil
 }
+func (fakeGigService) GetPreviewGigsByFreelancerUsername(context.Context, domain.ListPreviewGigsQuery) (*domain.ListPreviewGigsResult, error) {
+	return &domain.ListPreviewGigsResult{}, nil
+}
+func (fakeGigService) AppendPreviewGig(context.Context, *domain.Gig) error {
+	return nil
+}
+func (fakeGigService) RebuildPopularitySnapshots(context.Context, []*domain.Gig) error {
+	return nil
+}
 func (fakeGigService) GetOrderStartSnapshot(context.Context, string, string) (*app.OrderStartSnapshot, error) {
 	return &app.OrderStartSnapshot{
 		GigID:              "gig-1",
@@ -109,7 +118,7 @@ func (fakeGigService) GetOrderStartSnapshot(context.Context, string, string) (*a
 		PackageAvailable:   true,
 	}, nil
 }
-func (fakeGigService) Publish(context.Context, string, string) (*domain.Gig, error) {
+func (fakeGigService) Publish(context.Context, string, string, string) (*domain.Gig, error) {
 	return &domain.Gig{ID: "gig-1"}, nil
 }
 func (fakeGigService) Project(context.Context, *domain.Gig) (*domain.Gig, error) {
@@ -163,6 +172,10 @@ var _ = Describe("fx providers and invokes", func() {
 		GinkgoT().Setenv("NATS_URL", "nats://127.0.0.1:4222")
 		GinkgoT().Setenv("FILE_SERVICE_ADDRESS", "127.0.0.1:9096")
 		GinkgoT().Setenv("PAYMENT_SERVICE_ADDRESS", "127.0.0.1:9097")
+		GinkgoT().Setenv("USER_SERVICE_ADDRESS", "127.0.0.1:9098")
+		GinkgoT().Setenv("CLICKHOUSE_ENDPOINT", "http://127.0.0.1:8123")
+		GinkgoT().Setenv("CLICKHOUSE_USER", "admin")
+		GinkgoT().Setenv("CLICKHOUSE_PASSWORD", "admin")
 
 		cfg, err := ProvideConfig()
 		Expect(err).NotTo(HaveOccurred())
@@ -341,7 +354,7 @@ var _ = Describe("fx providers and invokes", func() {
 		Expect(readRepo).To(BeNil())
 		Expect(err).To(HaveOccurred())
 
-		svc, err := ProvideGigService(nil, nil, nil, nil, nil, nil, lg)
+		svc, err := ProvideGigService(&config.Config{Preview: config.PreviewPaginationConfig{PageSize: 1, WindowSize: 2}}, nil, nil, nil, nil, nil, nil, nil, lg)
 		Expect(svc).To(BeNil())
 		Expect(err).To(HaveOccurred())
 	})

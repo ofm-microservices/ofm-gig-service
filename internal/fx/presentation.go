@@ -17,10 +17,14 @@ import (
 var PresentationModule = fx.Options(
 	fx.Provide(
 		ProvideGigProjectionSubscriber,
+		ProvideGigPreviewProjectionSubscriber,
 		ProvideGRPCServer,
 	),
 	fx.Invoke(
 		InvokeSubscribeGigProjection,
+		InvokeSubscribeGigPreviewProjection,
+		InvokeWarmupSellerLookups,
+		InvokeRunPopularityMaterializer,
 		InvokeRunGRPCServer,
 	),
 )
@@ -36,6 +40,18 @@ func ProvideGigProjectionSubscriber(
 	lg logging.Logger,
 ) (events.GigProjectionSubscriber, error) {
 	return events.NewGigProjectionSubscriber(broker, svc, writer, mapr, cfg.NATS, lg)
+}
+
+// ProvideGigPreviewProjectionSubscriber constructs the NATS subscriber that
+// seeds the freelancer preview cache after publish.
+func ProvideGigPreviewProjectionSubscriber(
+	broker eventbroker.EventBroker,
+	svc app.GigService,
+	mapr app.GigEventMapper,
+	cfg *config.Config,
+	lg logging.Logger,
+) (events.GigPreviewProjectionSubscriber, error) {
+	return events.NewGigPreviewProjectionSubscriber(broker, svc, mapr, cfg.NATS, lg)
 }
 
 // ProvideGRPCServer constructs the gRPC draft workflow server exposed by
@@ -69,6 +85,37 @@ func InvokeSubscribeGigProjection(
 			}
 
 			lg.Info("gig-service initialized", logging.String("env", cfg.App.Env))
+			return nil
+		},
+		OnStop: func(context.Context) error {
+			if cancel != nil {
+				cancel()
+			}
+			return nil
+		},
+	})
+}
+
+// InvokeSubscribeGigPreviewProjection starts the gig preview projection pull
+// consumer.
+func InvokeSubscribeGigPreviewProjection(
+	lc fx.Lifecycle,
+	subscriber events.GigPreviewProjectionSubscriber,
+	cfg *config.Config,
+	lg logging.Logger,
+) {
+	var cancel context.CancelFunc
+
+	lc.Append(fx.Hook{
+		OnStart: func(context.Context) error {
+			runCtx, runCancel := context.WithCancel(context.Background())
+			cancel = runCancel
+
+			if err := subscriber.Subscribe(runCtx); err != nil {
+				lg.Error("subscribe to gig preview projection failed", logging.Err(err))
+				cancel()
+				return err
+			}
 			return nil
 		},
 		OnStop: func(context.Context) error {

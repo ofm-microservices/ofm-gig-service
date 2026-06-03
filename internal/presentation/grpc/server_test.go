@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 	"errors"
+	"net"
 	"time"
 
 	"gig-service/config"
@@ -135,6 +136,12 @@ var _ = Describe("gig gRPC server", func() {
 	})
 
 	It("starts and shuts down the grpc server", func() {
+		lis, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			Skip("network listeners are unavailable in this environment")
+		}
+		_ = lis.Close()
+
 		srvAny, err := NewServer(svc, config.GRPCConfig{Host: "127.0.0.1", Port: 0}, logger)
 		Expect(err).NotTo(HaveOccurred())
 		impl := srvAny.(*server)
@@ -144,10 +151,10 @@ var _ = Describe("gig gRPC server", func() {
 			done <- impl.Start()
 		}()
 
-		Eventually(func() bool { return impl.listener != nil }).Should(BeTrue())
+		Eventually(impl.started, 5*time.Second).Should(BeClosed())
 
 		Expect(impl.Shutdown(context.Background())).To(HaveOccurred())
-		Eventually(done).Should(Receive(BeNil()))
+		Eventually(done, 2*time.Second).Should(Receive(BeNil()))
 	})
 
 	It("returns listen errors from Start", func() {
@@ -194,7 +201,7 @@ var _ = Describe("gig gRPC server", func() {
 			svc.EXPECT().ReplaceMedia(gomock.Any(), "gig-1", "freelancer-1", gomock.Any()).Return(&domain.Gig{ID: "gig-1"}, nil)
 			return impl.ReplaceMedia(context.Background(), &gigv1.ReplaceMediaRequest{GigId: "gig-1", FreelancerId: "freelancer-1", Files: []*gigv1.MediaUpload{{Filename: "file", ContentType: "image/jpeg", Data: []byte("x")}}})
 		}),
-	Entry("GetDraft", func(impl *server) (any, error) {
+		Entry("GetDraft", func(impl *server) (any, error) {
 			svc.EXPECT().GetByID(gomock.Any(), "gig-1", "freelancer-1").Return(&domain.Gig{ID: "gig-1"}, nil)
 			return impl.GetDraft(context.Background(), &gigv1.GetDraftRequest{GigId: "gig-1", FreelancerId: "freelancer-1"})
 		}),
@@ -203,8 +210,8 @@ var _ = Describe("gig gRPC server", func() {
 			return impl.GetGigBySlug(context.Background(), &gigv1.GetGigBySlugRequest{Slug: "my-gig-019e706c-616e-7473-9c1a-838c33b75013"})
 		}),
 		Entry("Publish", func(impl *server) (any, error) {
-			svc.EXPECT().Publish(gomock.Any(), "gig-1", "freelancer-1").Return(&domain.Gig{ID: "gig-1"}, nil)
-			return impl.Publish(context.Background(), &gigv1.PublishRequest{GigId: "gig-1", FreelancerId: "freelancer-1"})
+			svc.EXPECT().Publish(gomock.Any(), "gig-1", "freelancer-1", "alex").Return(&domain.Gig{ID: "gig-1"}, nil)
+			return impl.Publish(context.Background(), &gigv1.PublishRequest{GigId: "gig-1", FreelancerId: "freelancer-1", Username: "alex"})
 		}),
 	)
 

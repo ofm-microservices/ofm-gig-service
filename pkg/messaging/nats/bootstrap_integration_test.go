@@ -56,10 +56,12 @@ var _ = Describe("nats bootstrap integration", func() {
 		defer conn.Close()
 
 		Expect(EnsureStream(config.NATSConfig{
-			URL:                 natsBootstrapURL,
-			GigEventsStream:     "GIG_EVENTS",
-			GigPublishedSubject: "gig.published",
-			GigProjectionSubject:"gig.projection.requested",
+			URL:                         natsBootstrapURL,
+			GigEventsStream:             "GIG_EVENTS",
+			GigPublishedSubject:         "gig.published",
+			GigProjectionSubject:        "gig.projection.requested",
+			GigPreviewProjectionSubject: "gig.preview.projection.requested",
+			GigViewedSubject:            "gig.viewed",
 		}, natsBootstrapLogger)).To(Succeed())
 
 		js, err := conn.JetStream()
@@ -68,6 +70,8 @@ var _ = Describe("nats bootstrap integration", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(info.Config.Subjects).To(ContainElement("gig.published"))
 		Expect(info.Config.Subjects).To(ContainElement("gig.projection.requested"))
+		Expect(info.Config.Subjects).To(ContainElement("gig.preview.projection.requested"))
+		Expect(info.Config.Subjects).To(ContainElement("gig.viewed"))
 	})
 
 	It("wraps invalid connection parameters", func() {

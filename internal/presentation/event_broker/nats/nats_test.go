@@ -62,10 +62,19 @@ func (fakeGigService) GetByID(context.Context, string, string) (*domain.Gig, err
 func (fakeGigService) GetPublicByID(context.Context, string) (*domain.Gig, error) {
 	return &domain.Gig{ID: "gig-1"}, nil
 }
+func (fakeGigService) GetPreviewGigsByFreelancerUsername(context.Context, domain.ListPreviewGigsQuery) (*domain.ListPreviewGigsResult, error) {
+	return &domain.ListPreviewGigsResult{}, nil
+}
+func (fakeGigService) AppendPreviewGig(context.Context, *domain.Gig) error {
+	return nil
+}
+func (fakeGigService) RebuildPopularitySnapshots(context.Context, []*domain.Gig) error {
+	return nil
+}
 func (fakeGigService) GetOrderStartSnapshot(context.Context, string, string) (*app.OrderStartSnapshot, error) {
 	return &app.OrderStartSnapshot{GigID: "gig-1", PackageID: "pkg-1", SellerID: "seller-1", GigTitle: "Gig", PackageTitle: "Basic", PackageDescription: "desc", PriceCents: 1, Currency: "usd", DeliveryDays: 1, PackageAvailable: true}, nil
 }
-func (fakeGigService) Publish(context.Context, string, string) (*domain.Gig, error) {
+func (fakeGigService) Publish(context.Context, string, string, string) (*domain.Gig, error) {
 	return &domain.Gig{ID: "gig-1"}, nil
 }
 func (fakeGigService) Project(_ context.Context, gig *domain.Gig) (*domain.Gig, error) {
@@ -136,6 +145,7 @@ type fakeGigMapper struct {
 
 func (m *fakeGigMapper) FromPublishedPayload([]byte) (*domain.Gig, error) { return m.gig, m.err }
 func (m *fakeGigMapper) ToPublishedPayload(*domain.Gig) ([]byte, error)   { return nil, nil }
+func (m *fakeGigMapper) ToViewedPayload(*domain.Gig) ([]byte, error)      { return nil, nil }
 func (m *fakeGigMapper) FromReadModelPayload([]byte) (*domain.Gig, error) { return m.gig, m.err }
 func (m *fakeGigMapper) ToReadModelPayload(*domain.Gig) ([]byte, error)   { return nil, nil }
 

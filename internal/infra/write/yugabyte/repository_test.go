@@ -76,8 +76,8 @@ var _ = Describe("yugabyte repository", func() {
 	It("creates a draft and loads the aggregate", func() {
 		mock.ExpectQuery(regexp.QuoteMeta(createGigDraftQuery)).
 			WithArgs(uuidV7Arg{}, "freelancer-1").
-			WillReturnRows(sqlmock.NewRows([]string{"gig_id", "freelancer_id", "slug", "title", "description", "category_id", "currency", "status", "basic_info_completed", "packages_completed", "requirements_completed", "media_completed", "picture_file_id", "published_at", "created_at", "updated_at"}).
-				AddRow("gig-1", "freelancer-1", "", "", "", int64(0), "", domain.StatusDraft, false, false, false, false, "", nil, now, now))
+			WillReturnRows(sqlmock.NewRows([]string{"gig_id", "freelancer_id", "seller_username", "slug", "title", "short_info", "description", "category_id", "currency", "status", "basic_info_completed", "packages_completed", "requirements_completed", "media_completed", "picture_file_id", "published_at", "created_at", "updated_at"}).
+				AddRow("gig-1", "freelancer-1", "", "", "", "", "", int64(0), "", domain.StatusDraft, false, false, false, false, "", nil, now, now))
 		expectGigLoads(mock, "gig-1", nil, nil, nil)
 
 		gig, err := repoSvc.CreateDraft(context.Background(), domain.CreateDraftParams{FreelancerID: "freelancer-1"})
@@ -98,13 +98,14 @@ var _ = Describe("yugabyte repository", func() {
 
 	It("updates basic info and reloads the aggregate", func() {
 		mock.ExpectQuery(regexp.QuoteMeta(updateGigBasicInfoQuery)).
-			WithArgs("gig-1", "Title", "slug", "desc", int64(1001), "usd").
-			WillReturnRows(sqlmock.NewRows([]string{"gig_id", "freelancer_id", "slug", "title", "description", "category_id", "currency", "status", "basic_info_completed", "packages_completed", "requirements_completed", "media_completed", "picture_file_id", "published_at", "created_at", "updated_at"}).
-				AddRow("gig-1", "freelancer-1", "slug", "Title", "desc", int64(1001), "usd", domain.StatusDraft, true, false, false, false, "", nil, now, now))
+			WithArgs("gig-1", "Title", "short", "slug", "desc", int64(1001), "usd").
+			WillReturnRows(sqlmock.NewRows([]string{"gig_id", "freelancer_id", "seller_username", "slug", "title", "short_info", "description", "category_id", "currency", "status", "basic_info_completed", "packages_completed", "requirements_completed", "media_completed", "picture_file_id", "published_at", "created_at", "updated_at"}).
+				AddRow("gig-1", "freelancer-1", "", "slug", "Title", "short", "desc", int64(1001), "usd", domain.StatusDraft, true, false, false, false, "", nil, now, now))
 		expectGigLoads(mock, "gig-1", nil, nil, nil)
 
 		gig, err := repoSvc.UpdateBasicInfo(context.Background(), "gig-1", domain.UpdateBasicInfoParams{
 			Title:       "Title",
+			ShortInfo:   "short",
 			Slug:        "slug",
 			Description: "desc",
 			CategoryID:  1001,
@@ -129,8 +130,8 @@ var _ = Describe("yugabyte repository", func() {
 		mock.ExpectExec(regexp.QuoteMeta("UPDATE gigs SET packages_completed = TRUE, updated_at = NOW() WHERE gig_id = $1")).WithArgs("gig-1").WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectCommit()
 		mock.ExpectQuery(regexp.QuoteMeta(getGigQuery)).WithArgs("gig-1").
-			WillReturnRows(sqlmock.NewRows([]string{"gig_id", "freelancer_id", "slug", "title", "description", "category_id", "currency", "status", "basic_info_completed", "packages_completed", "requirements_completed", "media_completed", "picture_file_id", "published_at", "created_at", "updated_at"}).
-				AddRow("gig-1", "freelancer-1", "slug", "Title", "desc", int64(1001), "usd", domain.StatusDraft, true, true, false, false, "file-1", nil, now, now))
+			WillReturnRows(sqlmock.NewRows([]string{"gig_id", "freelancer_id", "seller_username", "slug", "title", "short_info", "description", "category_id", "currency", "status", "basic_info_completed", "packages_completed", "requirements_completed", "media_completed", "picture_file_id", "published_at", "created_at", "updated_at"}).
+				AddRow("gig-1", "freelancer-1", "", "slug", "Title", "short", "desc", int64(1001), "usd", domain.StatusDraft, true, true, false, false, "file-1", nil, now, now))
 		expectGigLoads(mock, "gig-1", []model.GigPackageRow{{ID: "pkg-1", GigID: "gig-1", Tier: domain.TierBasic, Description: "basic", DeliveryDays: 1, PriceCents: 100, SortOrder: 1}, {ID: "pkg-2", GigID: "gig-1", Tier: domain.TierStandard, Description: "standard", DeliveryDays: 2, PriceCents: 200, SortOrder: 2}, {ID: "pkg-3", GigID: "gig-1", Tier: domain.TierPremium, Description: "premium", DeliveryDays: 3, PriceCents: 300, SortOrder: 3}}, nil, nil)
 
 		gig, err := repoSvc.ReplacePackages(context.Background(), "gig-1", domain.ReplacePackagesParams{
@@ -156,8 +157,8 @@ var _ = Describe("yugabyte repository", func() {
 		mock.ExpectExec(regexp.QuoteMeta("UPDATE gigs SET requirements_completed = TRUE, updated_at = NOW() WHERE gig_id = $1")).WithArgs("gig-1").WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectCommit()
 		mock.ExpectQuery(regexp.QuoteMeta(getGigQuery)).WithArgs("gig-1").
-			WillReturnRows(sqlmock.NewRows([]string{"gig_id", "freelancer_id", "slug", "title", "description", "category_id", "currency", "status", "basic_info_completed", "packages_completed", "requirements_completed", "media_completed", "picture_file_id", "published_at", "created_at", "updated_at"}).
-				AddRow("gig-1", "freelancer-1", "slug", "Title", "desc", int64(1001), "usd", domain.StatusDraft, true, true, true, false, "file-1", nil, now, now))
+			WillReturnRows(sqlmock.NewRows([]string{"gig_id", "freelancer_id", "seller_username", "slug", "title", "short_info", "description", "category_id", "currency", "status", "basic_info_completed", "packages_completed", "requirements_completed", "media_completed", "picture_file_id", "published_at", "created_at", "updated_at"}).
+				AddRow("gig-1", "freelancer-1", "", "slug", "Title", "short", "desc", int64(1001), "usd", domain.StatusDraft, true, true, true, false, "file-1", nil, now, now))
 		expectGigLoads(mock, "gig-1", nil, []model.GigQuestionRow{{ID: "q-1", GigID: "gig-1", Content: "question one", SortOrder: 1}, {ID: "q-2", GigID: "gig-1", Content: "question two", SortOrder: 2}}, nil)
 
 		gig, err := repoSvc.ReplaceQuestions(context.Background(), "gig-1", domain.ReplaceQuestionsParams{
@@ -179,8 +180,8 @@ var _ = Describe("yugabyte repository", func() {
 		mock.ExpectExec(regexp.QuoteMeta("UPDATE gigs SET picture_file_id = $2, media_completed = TRUE, updated_at = NOW() WHERE gig_id = $1")).WithArgs("gig-1", "file-1").WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectCommit()
 		mock.ExpectQuery(regexp.QuoteMeta(getGigQuery)).WithArgs("gig-1").
-			WillReturnRows(sqlmock.NewRows([]string{"gig_id", "freelancer_id", "slug", "title", "description", "category_id", "currency", "status", "basic_info_completed", "packages_completed", "requirements_completed", "media_completed", "picture_file_id", "published_at", "created_at", "updated_at"}).
-				AddRow("gig-1", "freelancer-1", "slug", "Title", "desc", int64(1001), "usd", domain.StatusDraft, true, true, true, true, "file-1", nil, now, now))
+			WillReturnRows(sqlmock.NewRows([]string{"gig_id", "freelancer_id", "seller_username", "slug", "title", "short_info", "description", "category_id", "currency", "status", "basic_info_completed", "packages_completed", "requirements_completed", "media_completed", "picture_file_id", "published_at", "created_at", "updated_at"}).
+				AddRow("gig-1", "freelancer-1", "", "slug", "Title", "short", "desc", int64(1001), "usd", domain.StatusDraft, true, true, true, true, "file-1", nil, now, now))
 		expectGigLoads(mock, "gig-1", nil, nil, []model.GigMediaRow{{ID: "media-1", GigID: "gig-1", FileID: "file-1", SortOrder: 1}, {ID: "media-2", GigID: "gig-1", FileID: "file-2", SortOrder: 2}})
 
 		gig, err := repoSvc.ReplaceMedia(context.Background(), "gig-1", domain.ReplaceMediaParams{
@@ -205,8 +206,8 @@ var _ = Describe("yugabyte repository", func() {
 	It("publishes a gig and reloads it", func() {
 		mock.ExpectQuery(regexp.QuoteMeta(publishGigQuery)).
 			WithArgs("gig-1").
-			WillReturnRows(sqlmock.NewRows([]string{"gig_id", "freelancer_id", "slug", "title", "description", "category_id", "currency", "status", "basic_info_completed", "packages_completed", "requirements_completed", "media_completed", "picture_file_id", "published_at", "created_at", "updated_at"}).
-				AddRow("gig-1", "freelancer-1", "slug", "Title", "desc", int64(1001), "usd", domain.StatusPublished, true, true, true, true, "file-1", now, now, now))
+			WillReturnRows(sqlmock.NewRows([]string{"gig_id", "freelancer_id", "seller_username", "slug", "title", "short_info", "description", "category_id", "currency", "status", "basic_info_completed", "packages_completed", "requirements_completed", "media_completed", "picture_file_id", "published_at", "created_at", "updated_at"}).
+				AddRow("gig-1", "freelancer-1", "", "slug", "Title", "short", "desc", int64(1001), "usd", domain.StatusPublished, true, true, true, true, "file-1", now, now, now))
 		expectGigLoads(mock, "gig-1", []model.GigPackageRow{{ID: "pkg-1", GigID: "gig-1", Tier: domain.TierBasic, Description: "basic", DeliveryDays: 1, PriceCents: 100, SortOrder: 1}}, []model.GigQuestionRow{{ID: "q-1", GigID: "gig-1", Content: "question", SortOrder: 1}}, []model.GigMediaRow{{ID: "media-1", GigID: "gig-1", FileID: "file-1", SortOrder: 1}})
 
 		gig, err := repoSvc.Publish(context.Background(), "gig-1")
@@ -256,9 +257,9 @@ var _ = Describe("yugabyte repository", func() {
 
 	It("reports query and transaction failures", func() {
 		mock.ExpectQuery(regexp.QuoteMeta(updateGigBasicInfoQuery)).
-			WithArgs("gig-1", "Title", "slug", "desc", int64(1001), "usd").
+			WithArgs("gig-1", "Title", "short", "slug", "desc", int64(1001), "usd").
 			WillReturnError(errors.New("update"))
-		gig, err := repoSvc.UpdateBasicInfo(context.Background(), "gig-1", domain.UpdateBasicInfoParams{Title: "Title", Slug: "slug", Description: "desc", CategoryID: 1001, Currency: "usd"})
+		gig, err := repoSvc.UpdateBasicInfo(context.Background(), "gig-1", domain.UpdateBasicInfoParams{Title: "Title", ShortInfo: "short", Slug: "slug", Description: "desc", CategoryID: 1001, Currency: "usd"})
 		Expect(gig).To(BeNil())
 		Expect(err).To(MatchError(ContainSubstring("find gig")))
 

@@ -18,6 +18,7 @@ type GigMapper interface {
 	ToGigResponse(gig *domain.Gig) *gigv1.Gig
 	ToOrderStartSnapshot(snapshot *service.OrderStartSnapshot) *gigv1.OrderStartSnapshot
 	ToGetGigBySlugResponse(gig *domain.Gig) *gigv1.GetGigBySlugResponse
+	ToGetPreviewGigsByFreelancerUsernameResponse(result *domain.ListPreviewGigsResult) *gigv1.GetPreviewGigsByFreelancerUsernameResponse
 	ToUpdateBasicInfoParams(req *gigv1.UpdateBasicInfoRequest) domain.UpdateBasicInfoParams
 	ToReplacePackagesParams(req *gigv1.ReplacePackagesRequest) domain.ReplacePackagesParams
 	ToReplaceQuestionsParams(req *gigv1.ReplaceQuestionsRequest) domain.ReplaceQuestionsParams
@@ -47,8 +48,10 @@ func (m *gigMapper) ToGigResponse(gig *domain.Gig) *gigv1.Gig {
 	resp := &gigv1.Gig{
 		GigId:                 gig.ID,
 		FreelancerId:          gig.FreelancerID,
+		SellerUsername:        gig.SellerUsername,
 		Slug:                  gig.Slug,
 		Title:                 gig.Title,
+		ShortInfo:             gig.ShortInfo,
 		Description:           gig.Description,
 		CategoryId:            gig.CategoryID,
 		Currency:              gig.Currency,
@@ -117,6 +120,7 @@ func (m *gigMapper) ToOrderStartSnapshot(snapshot *service.OrderStartSnapshot) *
 		GigId:              snapshot.GigID,
 		PackageId:          snapshot.PackageID,
 		SellerUserId:       snapshot.SellerID,
+		SellerUsername:     snapshot.SellerUsername,
 		GigTitle:           snapshot.GigTitle,
 		PackageTitle:       snapshot.PackageTitle,
 		PackageDescription: snapshot.PackageDescription,
@@ -147,10 +151,39 @@ func (m *gigMapper) ToGetGigBySlugResponse(gig *domain.Gig) *gigv1.GetGigBySlugR
 func (m *gigMapper) ToUpdateBasicInfoParams(req *gigv1.UpdateBasicInfoRequest) domain.UpdateBasicInfoParams {
 	return domain.UpdateBasicInfoParams{
 		Title:       req.GetTitle(),
+		ShortInfo:   req.GetShortInfo(),
 		Description: req.GetDescription(),
 		CategoryID:  req.GetCategoryId(),
 		Currency:    req.GetCurrency(),
 	}
+}
+
+func (m *gigMapper) ToGetPreviewGigsByFreelancerUsernameResponse(result *domain.ListPreviewGigsResult) *gigv1.GetPreviewGigsByFreelancerUsernameResponse {
+	if result == nil {
+		return nil
+	}
+	resp := &gigv1.GetPreviewGigsByFreelancerUsernameResponse{
+		Cursor:  result.Cursor,
+		HasMore: result.HasMore,
+	}
+	if len(result.Gigs) > 0 {
+		resp.Gigs = make([]*gigv1.GigPreview, 0, len(result.Gigs))
+		for _, gig := range result.Gigs {
+			if gig == nil {
+				continue
+			}
+			resp.Gigs = append(resp.Gigs, &gigv1.GigPreview{
+				GigId:             gig.ID,
+				Slug:              gig.Slug,
+				Title:             gig.Title,
+				ShortInfo:         gig.ShortInfo,
+				MinimumPriceCents: gig.MinimumPriceCents,
+				PictureUrl:        gig.PictureURL,
+				CreatedAt:         gig.CreatedAt.UTC().Format(timeFormat),
+			})
+		}
+	}
+	return resp
 }
 
 func (m *gigMapper) ToReplacePackagesParams(req *gigv1.ReplacePackagesRequest) domain.ReplacePackagesParams {
@@ -203,16 +236,18 @@ func (m *gigMapper) toPublicGigResponse(gig *domain.Gig) *gigv1.Gig {
 	}
 
 	resp := &gigv1.Gig{
-		GigId:        gig.ID,
-		FreelancerId: gig.FreelancerID,
-		Slug:         gig.Slug,
-		Title:        gig.Title,
-		Description:  gig.Description,
-		CategoryId:   gig.CategoryID,
-		Currency:     gig.Currency,
-		PictureUrl:   gig.PictureURL,
-		CreatedAt:    gig.CreatedAt.UTC().Format(timeFormat),
-		UpdatedAt:    gig.UpdatedAt.UTC().Format(timeFormat),
+		GigId:          gig.ID,
+		FreelancerId:   gig.FreelancerID,
+		SellerUsername: gig.SellerUsername,
+		Slug:           gig.Slug,
+		Title:          gig.Title,
+		ShortInfo:      gig.ShortInfo,
+		Description:    gig.Description,
+		CategoryId:     gig.CategoryID,
+		Currency:       gig.Currency,
+		PictureUrl:     gig.PictureURL,
+		CreatedAt:      gig.CreatedAt.UTC().Format(timeFormat),
+		UpdatedAt:      gig.UpdatedAt.UTC().Format(timeFormat),
 	}
 	if gig.PublishedAt != nil {
 		resp.PublishedAt = gig.PublishedAt.UTC().Format(timeFormat)
@@ -252,6 +287,7 @@ func (m *gigMapper) ToError(err error) error {
 		errors.Is(err, domain.ErrInvalidGigSlug),
 		errors.Is(err, domain.ErrInvalidFreelancerID),
 		errors.Is(err, domain.ErrInvalidTitle),
+		errors.Is(err, domain.ErrInvalidShortInfo),
 		errors.Is(err, domain.ErrInvalidDescription),
 		errors.Is(err, domain.ErrInvalidCategoryID),
 		errors.Is(err, domain.ErrInvalidCurrency),

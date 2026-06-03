@@ -59,6 +59,7 @@ var _ = Describe("nats broker integration", func() {
 			URL:                                  brokerIntegrationURL,
 			GigEventsStream:                      "GIG_EVENTS",
 			GigPublishedSubject:                  "gig.published",
+			GigViewedSubject:                     "gig.viewed",
 			GigProjectionDurable:                 "gig_projection",
 			GigProjectionBatchSize:               2,
 			GigProjectionMaxWait:                 50 * time.Millisecond,
@@ -86,7 +87,7 @@ var _ = Describe("nats broker integration", func() {
 		Expect(err).NotTo(HaveOccurred())
 		_, err = js.AddStream(&nats.StreamConfig{
 			Name:      cfg.GigEventsStream,
-			Subjects:  []string{cfg.GigPublishedSubject},
+			Subjects:  []string{cfg.GigPublishedSubject, cfg.GigViewedSubject},
 			Storage:   nats.FileStorage,
 			Retention: nats.LimitsPolicy,
 		})

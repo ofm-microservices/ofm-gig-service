@@ -3,24 +3,31 @@ package service
 import (
 	"context"
 	"errors"
+	"gig-service/config"
 	"gig-service/internal/domain"
 	"github.com/ofm-microservices/ofm-common/pkg/logging"
 	"strings"
+	"time"
 )
 
 type gigService struct {
-	repo     domain.GigRepository
-	readRepo domain.GigReadRepository
-	files    FileService
-	connect  ConnectStatusChecker
-	broker   EventBroker
-	slug     Slugger
-	mapr     GigEventMapper
-	log      Logger
+	repo               domain.GigRepository
+	readRepo           domain.GigReadRepository
+	files              FileService
+	connect            ConnectStatusChecker
+	broker             EventBroker
+	pop                PopularitySource
+	slug               Slugger
+	mapr               GigEventMapper
+	log                Logger
+	previewPageSize    int
+	previewWindowSize  int
+	previewPagesWindow int
+	previewWindowTTL   time.Duration
 }
 
 // New constructs the gig application service.
-func New(repo domain.GigRepository, readRepo domain.GigReadRepository, files FileService, connect ConnectStatusChecker, broker EventBroker, slugger Slugger, log Logger) (GigService, error) {
+func New(repo domain.GigRepository, readRepo domain.GigReadRepository, files FileService, connect ConnectStatusChecker, broker EventBroker, pop PopularitySource, slugger Slugger, log Logger, previewCfg config.PreviewPaginationConfig) (GigService, error) {
 	if repo == nil {
 		return nil, ErrNilGigRepository
 	}
@@ -36,22 +43,39 @@ func New(repo domain.GigRepository, readRepo domain.GigReadRepository, files Fil
 	if broker == nil {
 		return nil, ErrNilEventBroker
 	}
+	if pop == nil {
+		return nil, ErrNilPopularitySource
+	}
 	if slugger == nil {
 		return nil, ErrNilSlugger
 	}
 	if log == nil {
 		return nil, ErrNilLogger
 	}
+	if previewCfg.PageSize <= 0 {
+		return nil, ErrInvalidPreviewConfig
+	}
+	if previewCfg.WindowSize <= 0 {
+		return nil, ErrInvalidPreviewConfig
+	}
+	if previewCfg.WindowSize%previewCfg.PageSize != 0 {
+		return nil, ErrInvalidPreviewConfig
+	}
 
 	return &gigService{
-		repo:     repo,
-		readRepo: readRepo,
-		files:    files,
-		connect:  connect,
-		broker:   broker,
-		slug:     slugger,
-		mapr:     NewGigEventMapper(),
-		log:      log.With(logging.String("module", "application")),
+		repo:               repo,
+		readRepo:           readRepo,
+		files:              files,
+		connect:            connect,
+		broker:             broker,
+		pop:                pop,
+		slug:               slugger,
+		mapr:               NewGigEventMapper(),
+		log:                log.With(logging.String("module", "application")),
+		previewPageSize:    previewCfg.PageSize,
+		previewWindowSize:  previewCfg.WindowSize,
+		previewPagesWindow: previewCfg.WindowSize / previewCfg.PageSize,
+		previewWindowTTL:   previewCfg.WindowTTL,
 	}, nil
 }
 
@@ -79,6 +103,13 @@ func (s *gigService) UpdateBasicInfo(ctx context.Context, gigID, freelancerID st
 	if title == "" {
 		return nil, domain.ErrInvalidTitle
 	}
+	shortInfo := strings.TrimSpace(params.ShortInfo)
+	if shortInfo == "" {
+		return nil, domain.ErrInvalidShortInfo
+	}
+	if len(shortInfo) > 128 {
+		return nil, domain.ErrInvalidShortInfo
+	}
 	if params.Description == "" {
 		return nil, domain.ErrInvalidDescription
 	}
@@ -95,6 +126,7 @@ func (s *gigService) UpdateBasicInfo(ctx context.Context, gigID, freelancerID st
 
 	gig, err = s.repo.UpdateBasicInfo(ctx, gig.ID, domain.UpdateBasicInfoParams{
 		Title:       title,
+		ShortInfo:   shortInfo,
 		Slug:        slug,
 		Description: strings.TrimSpace(params.Description),
 		CategoryID:  params.CategoryID,
@@ -219,6 +251,23 @@ func (s *gigService) GetPublicByID(ctx context.Context, gigID string) (*domain.G
 
 	gig, err := s.readRepo.GetByID(ctx, gigID)
 	if err == nil && gig != nil {
+		if payload, err := s.mapr.ToViewedPayload(gig); err == nil {
+			if err := s.broker.Publish(ctx, gigViewedSubject, payload); err != nil {
+				s.log.Error("failed to publish gig viewed",
+					logging.Operation("gig.viewed"),
+					logging.String("gig_id", gig.ID),
+					logging.String("slug", gig.Slug),
+					logging.Err(err),
+				)
+			}
+		} else {
+			s.log.Error("failed to build gig viewed payload",
+				logging.Operation("gig.viewed"),
+				logging.String("gig_id", gig.ID),
+				logging.String("slug", gig.Slug),
+				logging.Err(err),
+			)
+		}
 		return gig, nil
 	}
 	if err != nil && !errors.Is(err, domain.ErrGigNotFound) {
@@ -241,7 +290,70 @@ func (s *gigService) GetPublicByID(ctx context.Context, gigID string) (*domain.G
 		return nil, err
 	}
 
+	if payload, err := s.mapr.ToViewedPayload(gig); err == nil {
+		if err := s.broker.Publish(ctx, gigViewedSubject, payload); err != nil {
+			s.log.Error("failed to publish gig viewed",
+				logging.Operation("gig.viewed"),
+				logging.String("gig_id", gig.ID),
+				logging.String("slug", gig.Slug),
+				logging.Err(err),
+			)
+		}
+	} else {
+		s.log.Error("failed to build gig viewed payload",
+			logging.Operation("gig.viewed"),
+			logging.String("gig_id", gig.ID),
+			logging.String("slug", gig.Slug),
+			logging.Err(err),
+		)
+	}
+
 	return gig, nil
+}
+
+// RebuildPopularitySnapshots refreshes the popularity snapshots for the
+// provided gigs using the current analytics aggregates.
+func (s *gigService) RebuildPopularitySnapshots(ctx context.Context, gigs []*domain.Gig) error {
+	if len(gigs) == 0 {
+		return nil
+	}
+
+	rows, err := s.pop.ListPopularityRows(ctx)
+	if err != nil {
+		return err
+	}
+	byID := make(map[string]PopularityRow, len(rows))
+	for _, row := range rows {
+		if strings.TrimSpace(row.GigID) == "" {
+			continue
+		}
+		byID[row.GigID] = row
+	}
+
+	now := time.Now().UTC()
+	for _, gig := range gigs {
+		if gig == nil || strings.TrimSpace(gig.ID) == "" {
+			continue
+		}
+		row := byID[gig.ID]
+		score := row.CompletedOrdersLast30d*1000 + row.ReviewsCountLast30d*200 + row.ViewsLast7d*5
+		if err := s.readRepo.SetPopularitySnapshot(ctx, &domain.GigPopularitySnapshot{
+			GigID:                  gig.ID,
+			Score:                  score,
+			CompletedOrdersLast30d: row.CompletedOrdersLast30d,
+			ReviewsCountLast30d:    row.ReviewsCountLast30d,
+			ViewsLast7d:            row.ViewsLast7d,
+			CalculatedAt:           now,
+		}); err != nil {
+			s.log.Error("refresh popularity snapshot failed",
+				logging.Operation("gig.popularity.refresh"),
+				logging.String("gig_id", gig.ID),
+				logging.Err(err),
+			)
+		}
+	}
+
+	return nil
 }
 
 func (s *gigService) GetOrderStartSnapshot(ctx context.Context, gigID, packageID string) (*OrderStartSnapshot, error) {
@@ -271,11 +383,23 @@ func (s *gigService) GetOrderStartSnapshot(ctx context.Context, gigID, packageID
 	if pkg == nil {
 		return nil, domain.ErrInvalidPackageTier
 	}
+	username := strings.TrimSpace(gig.SellerUsername)
+	if username == "" && s.readRepo != nil {
+		if cached, err := s.readRepo.GetByID(ctx, gig.ID); err == nil && cached != nil {
+			username = strings.TrimSpace(cached.SellerUsername)
+		}
+	}
+	if username != "" && strings.TrimSpace(gig.SellerUsername) == "" {
+		if updated, err := s.repo.UpdateSellerUsername(ctx, gig.ID, username); err == nil && updated != nil {
+			gig = updated
+		}
+	}
 
 	snapshot := &OrderStartSnapshot{
 		GigID:              gig.ID,
 		PackageID:          pkg.ID,
 		SellerID:           gig.FreelancerID,
+		SellerUsername:     username,
 		GigTitle:           gig.Title,
 		PackageTitle:       pkg.Tier,
 		PackageDescription: pkg.Description,
@@ -299,7 +423,7 @@ func (s *gigService) GetOrderStartSnapshot(ctx context.Context, gigID, packageID
 	return snapshot, nil
 }
 
-func (s *gigService) Publish(ctx context.Context, gigID, freelancerID string) (*domain.Gig, error) {
+func (s *gigService) Publish(ctx context.Context, gigID, freelancerID, username string) (*domain.Gig, error) {
 	gig, err := s.getOwnedGig(ctx, gigID, freelancerID)
 	if err != nil {
 		return nil, err
@@ -322,6 +446,14 @@ func (s *gigService) Publish(ctx context.Context, gigID, freelancerID string) (*
 		return nil, err
 	}
 
+	username = strings.TrimSpace(username)
+	if username != "" && strings.TrimSpace(gig.SellerUsername) == "" {
+		gig, err = s.repo.UpdateSellerUsername(ctx, gig.ID, username)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	payload, err := s.mapr.ToPublishedPayload(gig)
 	if err != nil {
 		return nil, err
@@ -330,6 +462,9 @@ func (s *gigService) Publish(ctx context.Context, gigID, freelancerID string) (*
 		return nil, err
 	}
 	if err := s.publishProjection(ctx, gig); err != nil {
+		return nil, err
+	}
+	if err := s.publishPreviewProjection(ctx, gig); err != nil {
 		return nil, err
 	}
 
@@ -391,6 +526,38 @@ func (s *gigService) publishProjection(ctx context.Context, gig *domain.Gig) err
 		return err
 	}
 	return s.broker.Publish(ctx, gigProjectionRequestedSubject, payload)
+}
+
+func (s *gigService) publishPreviewProjection(ctx context.Context, gig *domain.Gig) error {
+	payload, err := s.mapr.ToPublishedPayload(gig)
+	if err != nil {
+		return err
+	}
+	return s.broker.Publish(ctx, gigPreviewProjectionSubject, payload)
+}
+
+func (s *gigService) AppendPreviewGig(ctx context.Context, gig *domain.Gig) error {
+	if gig == nil {
+		return domain.ErrGigNotFound
+	}
+
+	current, err := s.readRepo.ListPreviewWindow(ctx, gig.FreelancerID, 0)
+	if err != nil && !errors.Is(err, domain.ErrGigNotFound) {
+		return err
+	}
+	if current == nil || len(current.Gigs) == 0 {
+		_, err := s.GetPreviewGigsByFreelancerUsername(ctx, domain.ListPreviewGigsQuery{
+			SellerUsername: gig.SellerUsername,
+			Cursor:         "",
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	preview := s.toPreview(gig, nil)
+	preview.PopularityScore = 0
+	return s.readRepo.AppendPreviewGig(ctx, gig.FreelancerID, preview, s.previewWindowSize, s.previewWindowTTL)
 }
 
 func (s *gigService) getOwnedGig(ctx context.Context, gigID, freelancerID string) (*domain.Gig, error) {
