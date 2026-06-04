@@ -122,6 +122,7 @@ func (m *gigMapper) ToOrderStartSnapshot(snapshot *service.OrderStartSnapshot) *
 		SellerUserId:       snapshot.SellerID,
 		SellerUsername:     snapshot.SellerUsername,
 		GigTitle:           snapshot.GigTitle,
+		PictureFileId:      snapshot.PictureFileID,
 		PackageTitle:       snapshot.PackageTitle,
 		PackageDescription: snapshot.PackageDescription,
 		PriceCents:         snapshot.PriceCents,
