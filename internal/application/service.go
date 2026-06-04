@@ -401,6 +401,7 @@ func (s *gigService) GetOrderStartSnapshot(ctx context.Context, gigID, packageID
 		SellerID:           gig.FreelancerID,
 		SellerUsername:     username,
 		GigTitle:           gig.Title,
+		PictureFileID:      gig.PictureFileID,
 		PackageTitle:       pkg.Tier,
 		PackageDescription: pkg.Description,
 		PriceCents:         pkg.PriceCents,
