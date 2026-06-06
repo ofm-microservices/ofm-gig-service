@@ -53,6 +53,10 @@ func EnsureStream(cfg config.NATSConfig, log logging.Logger) error {
 	if previewProjectionSubject == "" {
 		previewProjectionSubject = "gig.preview.projection.requested"
 	}
+	reviewRatingSubject := cfg.ReviewGigRatingSubject
+	if reviewRatingSubject == "" {
+		reviewRatingSubject = "review.rating.gig"
+	}
 	viewedSubject := cfg.GigViewedSubject
 	if viewedSubject == "" {
 		viewedSubject = "gig.viewed"

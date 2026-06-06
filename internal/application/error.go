@@ -11,6 +11,10 @@ var (
 	ErrNilFileService = errors.New("file service is nil")
 	// ErrNilConnectStatusChecker reports that the payment-service Connect lookup dependency was not provided.
 	ErrNilConnectStatusChecker = errors.New("connect status checker is nil")
+	// ErrNilReviewClient reports that the review-service rating lookup dependency was not provided.
+	ErrNilReviewClient = errors.New("review client is nil")
+	// ErrNilOrderCountClient reports that the order-service order count lookup dependency was not provided.
+	ErrNilOrderCountClient = errors.New("order count client is nil")
 	// ErrNilEventBroker reports that the event broker dependency was not provided.
 	ErrNilEventBroker = errors.New("event broker is nil")
 	// ErrNilPopularitySource reports that the popularity analytics dependency was not provided.

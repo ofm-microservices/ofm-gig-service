@@ -28,6 +28,18 @@ type ConnectStatusChecker interface {
 	GetConnectStatus(ctx context.Context, userID string) (*ConnectStatusResult, error)
 }
 
+// ReviewClient resolves gig rating aggregates from review-service.
+type ReviewClient interface {
+	GetGigRatingSummary(ctx context.Context, gigID string) (*ReviewSummary, error)
+	Close() error
+}
+
+// OrderCountClient resolves gig order counts from order-service.
+type OrderCountClient interface {
+	GetOrderCountByGigID(ctx context.Context, gigID string) (*OrderCountResult, error)
+	Close() error
+}
+
 // Slugger turns human-readable titles into URL-safe slugs for gig storage.
 type Slugger interface {
 	Generate(title, gigID string) string
@@ -50,6 +62,17 @@ type UserPreview struct {
 	DisplayName string
 	AvatarID    string
 	AvatarURL   string
+}
+
+// ReviewSummary carries the normalized gig rating aggregate.
+type ReviewSummary struct {
+	RatingAvg    float64
+	TotalReviews int64
+}
+
+// OrderCountResult carries the normalized gig order aggregate.
+type OrderCountResult struct {
+	OrderCount int64
 }
 
 // PopularityRow carries the aggregated analytics used to rebuild popularity
@@ -76,9 +99,16 @@ type GigService interface {
 	GetByID(ctx context.Context, gigID, freelancerID string) (*domain.Gig, error)
 	GetPublicByID(ctx context.Context, gigID string) (*domain.Gig, error)
 	GetPreviewGigsByFreelancerUsername(ctx context.Context, query domain.ListPreviewGigsQuery) (*domain.ListPreviewGigsResult, error)
+	GetMyGigs(ctx context.Context, query domain.ListMyGigsQuery) (*domain.ListMyGigsResult, error)
 	// AppendPreviewGig seeds the freelancer preview cache with a published gig
 	// using the current preview window policy.
 	AppendPreviewGig(ctx context.Context, gig *domain.Gig) error
+	// UpsertPreviewGig refreshes the owner preview projection for one gig.
+	UpsertPreviewGig(ctx context.Context, gig *domain.Gig) error
+	// RefreshPreviewRating refreshes the cached rating fields for one gig.
+	RefreshPreviewRating(ctx context.Context, gigID string) error
+	// RefreshPreviewOrderCount refreshes the cached order count for one gig.
+	RefreshPreviewOrderCount(ctx context.Context, gigID string) error
 	RebuildPopularitySnapshots(ctx context.Context, gigs []*domain.Gig) error
 	GetOrderStartSnapshot(ctx context.Context, gigID, packageID string) (*OrderStartSnapshot, error)
 	Publish(ctx context.Context, gigID, freelancerID, username string) (*domain.Gig, error)

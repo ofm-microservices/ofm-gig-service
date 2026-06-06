@@ -20,6 +20,11 @@ var (
 	ErrInvalidMediaUpload          = errors.New("invalid media upload")
 	ErrInvalidFileID               = errors.New("invalid file id")
 	ErrInvalidMediaRef             = ErrInvalidFileID
+	ErrInvalidGigListStatus        = errors.New("invalid gig list status")
+	ErrInvalidGigListSort          = errors.New("invalid gig list sort")
+	ErrInvalidGigListOrder         = errors.New("invalid gig list order")
+	ErrInvalidGigListPage          = errors.New("invalid gig list page")
+	ErrInvalidGigListLimit         = errors.New("invalid gig list limit")
 	ErrInvalidPackageCount         = errors.New("invalid package count")
 	ErrInvalidGigState             = errors.New("invalid gig state")
 	ErrConnectOnboardingIncomplete = errors.New("connect onboarding incomplete")

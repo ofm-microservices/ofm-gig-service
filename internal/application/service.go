@@ -15,6 +15,8 @@ type gigService struct {
 	readRepo           domain.GigReadRepository
 	files              FileService
 	connect            ConnectStatusChecker
+	review             ReviewClient
+	orderCount         OrderCountClient
 	broker             EventBroker
 	pop                PopularitySource
 	slug               Slugger
@@ -27,7 +29,7 @@ type gigService struct {
 }
 
 // New constructs the gig application service.
-func New(repo domain.GigRepository, readRepo domain.GigReadRepository, files FileService, connect ConnectStatusChecker, broker EventBroker, pop PopularitySource, slugger Slugger, log Logger, previewCfg config.PreviewPaginationConfig) (GigService, error) {
+func New(repo domain.GigRepository, readRepo domain.GigReadRepository, files FileService, connect ConnectStatusChecker, review ReviewClient, orderCount OrderCountClient, broker EventBroker, pop PopularitySource, slugger Slugger, log Logger, previewCfg config.PreviewPaginationConfig) (GigService, error) {
 	if repo == nil {
 		return nil, ErrNilGigRepository
 	}
@@ -39,6 +41,12 @@ func New(repo domain.GigRepository, readRepo domain.GigReadRepository, files Fil
 	}
 	if connect == nil {
 		return nil, ErrNilConnectStatusChecker
+	}
+	if review == nil {
+		return nil, ErrNilReviewClient
+	}
+	if orderCount == nil {
+		return nil, ErrNilOrderCountClient
 	}
 	if broker == nil {
 		return nil, ErrNilEventBroker
@@ -67,6 +75,8 @@ func New(repo domain.GigRepository, readRepo domain.GigReadRepository, files Fil
 		readRepo:           readRepo,
 		files:              files,
 		connect:            connect,
+		review:             review,
+		orderCount:         orderCount,
 		broker:             broker,
 		pop:                pop,
 		slug:               slugger,
@@ -88,6 +98,9 @@ func (s *gigService) CreateDraft(ctx context.Context, freelancerID string) (*dom
 	gig, err := s.repo.CreateDraft(ctx, domain.CreateDraftParams{FreelancerID: freelancerID})
 	if err != nil {
 		s.log.Error("failed to create gig draft", logging.String("freelancer_id", freelancerID), logging.Err(err))
+		return nil, err
+	}
+	if err := s.publishPreviewProjection(ctx, gig); err != nil {
 		return nil, err
 	}
 
@@ -138,6 +151,9 @@ func (s *gigService) UpdateBasicInfo(ctx context.Context, gigID, freelancerID st
 	if err := s.publishProjection(ctx, gig); err != nil {
 		return nil, err
 	}
+	if err := s.publishPreviewProjection(ctx, gig); err != nil {
+		return nil, err
+	}
 
 	return gig, nil
 }
@@ -175,6 +191,9 @@ func (s *gigService) ReplacePackages(ctx context.Context, gigID, freelancerID st
 	if err := s.publishProjection(ctx, gig); err != nil {
 		return nil, err
 	}
+	if err := s.publishPreviewProjection(ctx, gig); err != nil {
+		return nil, err
+	}
 
 	return gig, nil
 }
@@ -195,6 +214,9 @@ func (s *gigService) ReplaceQuestions(ctx context.Context, gigID, freelancerID s
 		return nil, err
 	}
 	if err := s.publishProjection(ctx, gig); err != nil {
+		return nil, err
+	}
+	if err := s.publishPreviewProjection(ctx, gig); err != nil {
 		return nil, err
 	}
 
@@ -228,6 +250,9 @@ func (s *gigService) ReplaceMedia(ctx context.Context, gigID, freelancerID strin
 		return nil, err
 	}
 	if err := s.publishProjection(ctx, gig); err != nil {
+		return nil, err
+	}
+	if err := s.publishPreviewProjection(ctx, gig); err != nil {
 		return nil, err
 	}
 
@@ -542,21 +567,42 @@ func (s *gigService) AppendPreviewGig(ctx context.Context, gig *domain.Gig) erro
 		return domain.ErrGigNotFound
 	}
 
+	if err := s.UpsertPreviewGig(ctx, gig); err != nil {
+		return err
+	}
+	if gig.Status != domain.StatusPublished {
+		return nil
+	}
+
 	current, err := s.readRepo.ListPreviewWindow(ctx, gig.FreelancerID, 0)
 	if err != nil && !errors.Is(err, domain.ErrGigNotFound) {
 		return err
 	}
 	if current == nil || len(current.Gigs) == 0 {
+		if _, err := s.readRepo.GetUserLookup(ctx, gig.SellerUsername); err != nil && !errors.Is(err, domain.ErrGigNotFound) {
+			return err
+		}
+		current, err = s.readRepo.ListPreviewWindow(ctx, gig.FreelancerID, 0)
+		if err != nil && !errors.Is(err, domain.ErrGigNotFound) {
+			return err
+		}
+		if current != nil && len(current.Gigs) > 0 {
+			preview := s.toPreview(gig, nil, nil, nil)
+			preview.PopularityScore = 0
+			return s.readRepo.AppendPreviewGig(ctx, gig.FreelancerID, preview, s.previewWindowSize, s.previewWindowTTL)
+		}
+
 		_, err := s.GetPreviewGigsByFreelancerUsername(ctx, domain.ListPreviewGigsQuery{
 			SellerUsername: gig.SellerUsername,
-			Cursor:         "",
+			Page:           1,
+			Limit:          s.previewPageSize,
 		})
 		if err != nil {
 			return err
 		}
 	}
 
-	preview := s.toPreview(gig, nil)
+	preview := s.toPreview(gig, nil, nil, nil)
 	preview.PopularityScore = 0
 	return s.readRepo.AppendPreviewGig(ctx, gig.FreelancerID, preview, s.previewWindowSize, s.previewWindowTTL)
 }

@@ -65,7 +65,19 @@ func (fakeGigService) GetPublicByID(context.Context, string) (*domain.Gig, error
 func (fakeGigService) GetPreviewGigsByFreelancerUsername(context.Context, domain.ListPreviewGigsQuery) (*domain.ListPreviewGigsResult, error) {
 	return &domain.ListPreviewGigsResult{}, nil
 }
+func (fakeGigService) GetMyGigs(context.Context, domain.ListMyGigsQuery) (*domain.ListMyGigsResult, error) {
+	return &domain.ListMyGigsResult{}, nil
+}
 func (fakeGigService) AppendPreviewGig(context.Context, *domain.Gig) error {
+	return nil
+}
+func (fakeGigService) UpsertPreviewGig(context.Context, *domain.Gig) error {
+	return nil
+}
+func (fakeGigService) RefreshPreviewRating(context.Context, string) error {
+	return nil
+}
+func (fakeGigService) RefreshPreviewOrderCount(context.Context, string) error {
 	return nil
 }
 func (fakeGigService) RebuildPopularitySnapshots(context.Context, []*domain.Gig) error {

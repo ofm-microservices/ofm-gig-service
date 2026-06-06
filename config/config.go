@@ -17,6 +17,8 @@ type Config struct {
 	NATS           NATSConfig
 	FileService    FileServiceConfig
 	PaymentService PaymentServiceConfig
+	ReviewService  ReviewServiceConfig
+	OrderService   OrderServiceConfig
 	UserService    UserServiceConfig
 	ClickHouse     ClickHouseConfig
 }

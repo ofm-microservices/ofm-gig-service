@@ -270,8 +270,8 @@ func (s *server) GetPreviewGigsByFreelancerUsername(ctx context.Context, req *gi
 	log := logging.WithContext(ctx, s.log)
 	result, err := s.svc.GetPreviewGigsByFreelancerUsername(ctx, domain.ListPreviewGigsQuery{
 		SellerUsername: req.GetUsername(),
-		Cursor:         req.GetCursor(),
-		Limit:          0,
+		Page:           int(req.GetPage()),
+		Limit:          int(req.GetLimit()),
 	})
 	if err != nil {
 		log.Error("get preview gigs by freelancer username failed",
@@ -286,6 +286,33 @@ func (s *server) GetPreviewGigsByFreelancerUsername(ctx context.Context, req *gi
 	}
 
 	return s.mapr.ToGetPreviewGigsByFreelancerUsernameResponse(result), nil
+}
+
+// GetMyGigs returns the authenticated owner's gig preview list.
+func (s *server) GetMyGigs(ctx context.Context, req *gigv1.GetMyGigsRequest) (*gigv1.GetMyGigsResponse, error) {
+	started := time.Now()
+	log := logging.WithContext(ctx, s.log)
+	result, err := s.svc.GetMyGigs(ctx, domain.ListMyGigsQuery{
+		UserID: req.GetUserId(),
+		Status: req.GetStatus(),
+		Sort:   req.GetSort(),
+		Order:  req.GetOrder(),
+		Page:   int(req.GetPage()),
+		Limit:  int(req.GetLimit()),
+	})
+	if err != nil {
+		log.Error("get my gigs failed",
+			logging.Operation("grpc.gig.get_my_gigs"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("user_id", req.GetUserId()),
+			logging.Err(err),
+		)
+		return nil, s.mapr.ToError(err)
+	}
+
+	return s.mapr.ToGetMyGigsResponse(result), nil
 }
 
 // Publish makes the gig visible and emits the published event.

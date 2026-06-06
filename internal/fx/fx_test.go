@@ -96,7 +96,19 @@ func (fakeGigService) GetPublicByID(context.Context, string) (*domain.Gig, error
 func (fakeGigService) GetPreviewGigsByFreelancerUsername(context.Context, domain.ListPreviewGigsQuery) (*domain.ListPreviewGigsResult, error) {
 	return &domain.ListPreviewGigsResult{}, nil
 }
+func (fakeGigService) GetMyGigs(context.Context, domain.ListMyGigsQuery) (*domain.ListMyGigsResult, error) {
+	return &domain.ListMyGigsResult{}, nil
+}
 func (fakeGigService) AppendPreviewGig(context.Context, *domain.Gig) error {
+	return nil
+}
+func (fakeGigService) UpsertPreviewGig(context.Context, *domain.Gig) error {
+	return nil
+}
+func (fakeGigService) RefreshPreviewRating(context.Context, string) error {
+	return nil
+}
+func (fakeGigService) RefreshPreviewOrderCount(context.Context, string) error {
 	return nil
 }
 func (fakeGigService) RebuildPopularitySnapshots(context.Context, []*domain.Gig) error {
@@ -172,6 +184,8 @@ var _ = Describe("fx providers and invokes", func() {
 		GinkgoT().Setenv("NATS_URL", "nats://127.0.0.1:4222")
 		GinkgoT().Setenv("FILE_SERVICE_ADDRESS", "127.0.0.1:9096")
 		GinkgoT().Setenv("PAYMENT_SERVICE_ADDRESS", "127.0.0.1:9097")
+		GinkgoT().Setenv("REVIEW_SERVICE_ADDRESS", "127.0.0.1:9099")
+		GinkgoT().Setenv("ORDER_SERVICE_ADDRESS", "127.0.0.1:9100")
 		GinkgoT().Setenv("USER_SERVICE_ADDRESS", "127.0.0.1:9098")
 		GinkgoT().Setenv("CLICKHOUSE_ENDPOINT", "http://127.0.0.1:8123")
 		GinkgoT().Setenv("CLICKHOUSE_USER", "admin")
@@ -354,7 +368,7 @@ var _ = Describe("fx providers and invokes", func() {
 		Expect(readRepo).To(BeNil())
 		Expect(err).To(HaveOccurred())
 
-		svc, err := ProvideGigService(&config.Config{Preview: config.PreviewPaginationConfig{PageSize: 1, WindowSize: 2}}, nil, nil, nil, nil, nil, nil, nil, lg)
+		svc, err := ProvideGigService(&config.Config{Preview: config.PreviewPaginationConfig{PageSize: 1, WindowSize: 2}}, nil, nil, nil, nil, nil, nil, nil, nil, nil, lg)
 		Expect(svc).To(BeNil())
 		Expect(err).To(HaveOccurred())
 	})

@@ -260,6 +260,50 @@ func (mr *MockGigReadRepositoryMockRecorder) GetPopularitySnapshot(ctx, gigID an
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPopularitySnapshot", reflect.TypeOf((*MockGigReadRepository)(nil).GetPopularitySnapshot), ctx, gigID)
 }
 
+// GetPreviewByID mocks base method.
+func (m *MockGigReadRepository) GetPreviewByID(ctx context.Context, gigID string) (*domain.GigPreview, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPreviewByID", ctx, gigID)
+	ret0, _ := ret[0].(*domain.GigPreview)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPreviewByID indicates an expected call of GetPreviewByID.
+func (mr *MockGigReadRepositoryMockRecorder) GetPreviewByID(ctx, gigID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPreviewByID", reflect.TypeOf((*MockGigReadRepository)(nil).GetPreviewByID), ctx, gigID)
+}
+
+// ListOwnerPreviewGigs mocks base method.
+func (m *MockGigReadRepository) ListOwnerPreviewGigs(ctx context.Context, userID string) ([]*domain.GigPreview, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListOwnerPreviewGigs", ctx, userID)
+	ret0, _ := ret[0].([]*domain.GigPreview)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListOwnerPreviewGigs indicates an expected call of ListOwnerPreviewGigs.
+func (mr *MockGigReadRepositoryMockRecorder) ListOwnerPreviewGigs(ctx, userID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListOwnerPreviewGigs", reflect.TypeOf((*MockGigReadRepository)(nil).ListOwnerPreviewGigs), ctx, userID)
+}
+
+// UpsertOwnerPreview mocks base method.
+func (m *MockGigReadRepository) UpsertOwnerPreview(ctx context.Context, userID string, gig *domain.GigPreview) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpsertOwnerPreview", ctx, userID, gig)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpsertOwnerPreview indicates an expected call of UpsertOwnerPreview.
+func (mr *MockGigReadRepositoryMockRecorder) UpsertOwnerPreview(ctx, userID, gig any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertOwnerPreview", reflect.TypeOf((*MockGigReadRepository)(nil).UpsertOwnerPreview), ctx, userID, gig)
+}
+
 // ListPopularitySnapshotsByGigIDs mocks base method.
 func (m *MockGigReadRepository) ListPopularitySnapshotsByGigIDs(ctx context.Context, gigIDs []string) (map[string]*domain.GigPopularitySnapshot, error) {
 	m.ctrl.T.Helper()

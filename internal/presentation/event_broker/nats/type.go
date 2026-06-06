@@ -22,6 +22,18 @@ type GigPreviewProjectionSubscriber interface {
 	Subscribe(ctx context.Context) error
 }
 
+// GigReviewRatingSubscriber consumes gig rating update events from NATS and
+// refreshes the owner gig preview cache.
+type GigReviewRatingSubscriber interface {
+	Subscribe(ctx context.Context) error
+}
+
+// GigOrderCountSubscriber consumes order lifecycle events from NATS and
+// refreshes the owner gig preview cache order count.
+type GigOrderCountSubscriber interface {
+	Subscribe(ctx context.Context) error
+}
+
 // ProjectionWriter stores projected gig read models.
 type ProjectionWriter interface {
 	Upsert(ctx context.Context, gig *domain.Gig) error
