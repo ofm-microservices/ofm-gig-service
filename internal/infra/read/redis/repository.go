@@ -194,6 +194,36 @@ func (r *repo) UpsertPreviewWindow(ctx context.Context, userID string, window in
 	return nil
 }
 
+func (r *repo) UpsertOwnerPreview(ctx context.Context, userID string, gig *domain.GigPreview) error {
+	started := time.Now()
+	status := "success"
+	defer func() { metrics.Global().ObserveRedis("set", "gig_preview_owner", status, time.Since(started)) }()
+
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return domain.ErrInvalidUsername
+	}
+	if gig == nil || strings.TrimSpace(gig.ID) == "" {
+		return ErrNilGig
+	}
+	payload, err := json.Marshal(gig)
+	if err != nil {
+		status = "error"
+		return err
+	}
+	pipe := r.rdb.Pipeline()
+	pipe.Set(ctx, GigPreviewPayloadKey(gig.ID), payload, 0)
+	pipe.ZAdd(ctx, GigOwnerPreviewIndexKey(userID), redis.Z{
+		Score:  float64(gig.UpdatedAt.UnixMilli()),
+		Member: gig.ID,
+	})
+	if _, err := pipe.Exec(ctx); err != nil {
+		status = "error"
+		return err
+	}
+	return nil
+}
+
 func (r *repo) AppendPreviewGig(ctx context.Context, userID string, gig *domain.GigPreview, windowSize int, ttl time.Duration) error {
 	started := time.Now()
 	status := "success"
@@ -212,14 +242,17 @@ func (r *repo) AppendPreviewGig(ctx context.Context, userID string, gig *domain.
 
 	leaseKey := GigPreviewLeaseKey(userID)
 	token := fmt.Sprintf("%d-%s", time.Now().UTC().UnixNano(), gig.ID)
-	ok, err := r.rdb.SetNX(ctx, leaseKey, token, 15*time.Second).Result()
-	if err != nil {
+	cmd := r.rdb.SetArgs(ctx, leaseKey, token, redis.SetArgs{
+		Mode: "NX",
+		TTL:  15 * time.Second,
+	})
+	if err := cmd.Err(); err != nil {
+		if err == redis.Nil {
+			status = "error"
+			return ErrPreviewLeaseBusy
+		}
 		status = "error"
 		return WrapPreviewLeaseError(leaseKey, err)
-	}
-	if !ok {
-		status = "error"
-		return ErrPreviewLeaseBusy
 	}
 	defer func() {
 		released, relErr := r.releasePreviewLease(ctx, leaseKey, token)
@@ -341,6 +374,96 @@ return out`
 		cached.Gigs = append(cached.Gigs, &gig)
 	}
 	return cached, nil
+}
+
+func (r *repo) ListOwnerPreviewGigs(ctx context.Context, userID string) ([]*domain.GigPreview, error) {
+	started := time.Now()
+	status := "success"
+	defer func() { metrics.Global().ObserveRedis("get", "gig_preview_owner", status, time.Since(started)) }()
+
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return nil, domain.ErrInvalidUsername
+	}
+	indexKey := GigOwnerPreviewIndexKey(userID)
+	ids, err := r.rdb.ZRangeArgs(ctx, redis.ZRangeArgs{
+		Key:   indexKey,
+		Start: 0,
+		Stop:  -1,
+		Rev:   true,
+	}).Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return nil, domain.ErrGigNotFound
+		}
+		status = "error"
+		return nil, err
+	}
+	if len(ids) == 0 {
+		return nil, domain.ErrGigNotFound
+	}
+	keys := make([]string, 0, len(ids))
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		keys = append(keys, GigPreviewPayloadKey(id))
+	}
+	if len(keys) == 0 {
+		return nil, domain.ErrGigNotFound
+	}
+	raws, err := r.rdb.MGet(ctx, keys...).Result()
+	if err != nil {
+		status = "error"
+		return nil, err
+	}
+	out := make([]*domain.GigPreview, 0, len(raws))
+	for _, item := range raws {
+		if item == nil {
+			continue
+		}
+		raw, ok := item.(string)
+		if !ok || strings.TrimSpace(raw) == "" {
+			continue
+		}
+		var gig domain.GigPreview
+		if err := json.Unmarshal([]byte(raw), &gig); err != nil {
+			status = "error"
+			return nil, err
+		}
+		out = append(out, &gig)
+	}
+	if len(out) == 0 {
+		return nil, domain.ErrGigNotFound
+	}
+	return out, nil
+}
+
+func (r *repo) GetPreviewByID(ctx context.Context, gigID string) (*domain.GigPreview, error) {
+	started := time.Now()
+	status := "success"
+	defer func() { metrics.Global().ObserveRedis("get", "gig_preview_owner", status, time.Since(started)) }()
+
+	gigID = strings.TrimSpace(gigID)
+	if gigID == "" {
+		return nil, domain.ErrInvalidGigID
+	}
+
+	raw, err := r.rdb.Get(ctx, GigPreviewPayloadKey(gigID)).Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return nil, domain.ErrGigNotFound
+		}
+		status = "error"
+		return nil, err
+	}
+	var gig domain.GigPreview
+	if err := json.Unmarshal([]byte(raw), &gig); err != nil {
+		status = "error"
+		return nil, err
+	}
+	return &gig, nil
 }
 
 func (r *repo) previewWindowIndexes(ctx context.Context, userID string) ([]int, error) {
@@ -573,6 +696,12 @@ func GigPreviewWindowKey(userID string, window int) string {
 // GigPreviewPayloadKey builds the Redis key used for one preview gig payload.
 func GigPreviewPayloadKey(gigID string) string {
 	return fmt.Sprintf("gig:preview:%s", strings.TrimSpace(gigID))
+}
+
+// GigOwnerPreviewIndexKey builds the Redis key used for the owner gig preview
+// index.
+func GigOwnerPreviewIndexKey(userID string) string {
+	return fmt.Sprintf("gig:preview:owner:%s", strings.TrimSpace(userID))
 }
 
 // GigPreviewLeaseKey builds the Redis key used to serialize preview window

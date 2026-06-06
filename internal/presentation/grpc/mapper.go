@@ -19,6 +19,7 @@ type GigMapper interface {
 	ToOrderStartSnapshot(snapshot *service.OrderStartSnapshot) *gigv1.OrderStartSnapshot
 	ToGetGigBySlugResponse(gig *domain.Gig) *gigv1.GetGigBySlugResponse
 	ToGetPreviewGigsByFreelancerUsernameResponse(result *domain.ListPreviewGigsResult) *gigv1.GetPreviewGigsByFreelancerUsernameResponse
+	ToGetMyGigsResponse(result *domain.ListMyGigsResult) *gigv1.GetMyGigsResponse
 	ToUpdateBasicInfoParams(req *gigv1.UpdateBasicInfoRequest) domain.UpdateBasicInfoParams
 	ToReplacePackagesParams(req *gigv1.ReplacePackagesRequest) domain.ReplacePackagesParams
 	ToReplaceQuestionsParams(req *gigv1.ReplaceQuestionsRequest) domain.ReplaceQuestionsParams
@@ -164,8 +165,9 @@ func (m *gigMapper) ToGetPreviewGigsByFreelancerUsernameResponse(result *domain.
 		return nil
 	}
 	resp := &gigv1.GetPreviewGigsByFreelancerUsernameResponse{
-		Cursor:  result.Cursor,
-		HasMore: result.HasMore,
+		Page:       int32(result.Page),
+		Limit:      int32(result.Limit),
+		TotalPages: int32(result.TotalPages),
 	}
 	if len(result.Gigs) > 0 {
 		resp.Gigs = make([]*gigv1.GigPreview, 0, len(result.Gigs))
@@ -181,6 +183,47 @@ func (m *gigMapper) ToGetPreviewGigsByFreelancerUsernameResponse(result *domain.
 				MinimumPriceCents: gig.MinimumPriceCents,
 				PictureUrl:        gig.PictureURL,
 				CreatedAt:         gig.CreatedAt.UTC().Format(timeFormat),
+				Status:            gig.Status,
+				PublishedAt:       formatTimePtr(gig.PublishedAt),
+				UpdatedAt:         gig.UpdatedAt.UTC().Format(timeFormat),
+				RatingAvg:         gig.RatingAvg,
+				TotalReviews:      gig.TotalReviews,
+				OrderCount:        gig.OrderCount,
+			})
+		}
+	}
+	return resp
+}
+
+func (m *gigMapper) ToGetMyGigsResponse(result *domain.ListMyGigsResult) *gigv1.GetMyGigsResponse {
+	if result == nil {
+		return nil
+	}
+	resp := &gigv1.GetMyGigsResponse{
+		Page:       int32(result.Page),
+		Limit:      int32(result.Limit),
+		TotalPages: int32(result.TotalPages),
+	}
+	if len(result.Gigs) > 0 {
+		resp.Gigs = make([]*gigv1.GigPreview, 0, len(result.Gigs))
+		for _, gig := range result.Gigs {
+			if gig == nil {
+				continue
+			}
+			resp.Gigs = append(resp.Gigs, &gigv1.GigPreview{
+				GigId:             gig.ID,
+				Slug:              gig.Slug,
+				Title:             gig.Title,
+				ShortInfo:         gig.ShortInfo,
+				MinimumPriceCents: gig.MinimumPriceCents,
+				PictureUrl:        gig.PictureURL,
+				CreatedAt:         gig.CreatedAt.UTC().Format(timeFormat),
+				Status:            gig.Status,
+				PublishedAt:       formatTimePtr(gig.PublishedAt),
+				UpdatedAt:         gig.UpdatedAt.UTC().Format(timeFormat),
+				RatingAvg:         gig.RatingAvg,
+				TotalReviews:      gig.TotalReviews,
+				OrderCount:        gig.OrderCount,
 			})
 		}
 	}
@@ -229,6 +272,13 @@ func (m *gigMapper) ToReplaceMediaParams(req *gigv1.ReplaceMediaRequest) domain.
 	}
 
 	return domain.ReplaceMediaUploadParams{Files: files}
+}
+
+func formatTimePtr(ts *time.Time) string {
+	if ts == nil {
+		return ""
+	}
+	return ts.UTC().Format(timeFormat)
 }
 
 func (m *gigMapper) toPublicGigResponse(gig *domain.Gig) *gigv1.Gig {

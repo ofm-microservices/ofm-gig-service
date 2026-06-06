@@ -300,6 +300,63 @@ func (mr *MockGigServiceMockRecorder) GetPreviewGigsByFreelancerUsername(ctx, qu
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPreviewGigsByFreelancerUsername", reflect.TypeOf((*MockGigService)(nil).GetPreviewGigsByFreelancerUsername), ctx, query)
 }
 
+// GetMyGigs mocks base method.
+func (m *MockGigService) GetMyGigs(ctx context.Context, query domain.ListMyGigsQuery) (*domain.ListMyGigsResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMyGigs", ctx, query)
+	ret0, _ := ret[0].(*domain.ListMyGigsResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetMyGigs indicates an expected call of GetMyGigs.
+func (mr *MockGigServiceMockRecorder) GetMyGigs(ctx, query any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMyGigs", reflect.TypeOf((*MockGigService)(nil).GetMyGigs), ctx, query)
+}
+
+// UpsertPreviewGig mocks base method.
+func (m *MockGigService) UpsertPreviewGig(ctx context.Context, gig *domain.Gig) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpsertPreviewGig", ctx, gig)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpsertPreviewGig indicates an expected call of UpsertPreviewGig.
+func (mr *MockGigServiceMockRecorder) UpsertPreviewGig(ctx, gig any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertPreviewGig", reflect.TypeOf((*MockGigService)(nil).UpsertPreviewGig), ctx, gig)
+}
+
+// RefreshPreviewRating mocks base method.
+func (m *MockGigService) RefreshPreviewRating(ctx context.Context, gigID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RefreshPreviewRating", ctx, gigID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RefreshPreviewRating indicates an expected call of RefreshPreviewRating.
+func (mr *MockGigServiceMockRecorder) RefreshPreviewRating(ctx, gigID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RefreshPreviewRating", reflect.TypeOf((*MockGigService)(nil).RefreshPreviewRating), ctx, gigID)
+}
+
+// RefreshPreviewOrderCount mocks base method.
+func (m *MockGigService) RefreshPreviewOrderCount(ctx context.Context, gigID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RefreshPreviewOrderCount", ctx, gigID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RefreshPreviewOrderCount indicates an expected call of RefreshPreviewOrderCount.
+func (mr *MockGigServiceMockRecorder) RefreshPreviewOrderCount(ctx, gigID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RefreshPreviewOrderCount", reflect.TypeOf((*MockGigService)(nil).RefreshPreviewOrderCount), ctx, gigID)
+}
+
 // AppendPreviewGig mocks base method.
 func (m *MockGigService) AppendPreviewGig(ctx context.Context, gig *domain.Gig) error {
 	m.ctrl.T.Helper()

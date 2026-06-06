@@ -20,6 +20,8 @@ func newApp() *fx.App {
 		appfx.UserClientModule,
 		appfx.AnalyticsModule,
 		appfx.RepoModule,
+		appfx.OrderClientModule,
+		appfx.ReviewClientModule,
 		appfx.ServiceModule,
 		appfx.PresentationModule,
 	)

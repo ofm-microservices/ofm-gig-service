@@ -18,11 +18,15 @@ var PresentationModule = fx.Options(
 	fx.Provide(
 		ProvideGigProjectionSubscriber,
 		ProvideGigPreviewProjectionSubscriber,
+		ProvideGigReviewRatingSubscriber,
+		ProvideGigOrderFundedSubscriber,
 		ProvideGRPCServer,
 	),
 	fx.Invoke(
 		InvokeSubscribeGigProjection,
 		InvokeSubscribeGigPreviewProjection,
+		InvokeSubscribeGigReviewRating,
+		InvokeSubscribeGigOrderFunded,
 		InvokeWarmupSellerLookups,
 		InvokeRunPopularityMaterializer,
 		InvokeRunGRPCServer,
@@ -52,6 +56,28 @@ func ProvideGigPreviewProjectionSubscriber(
 	lg logging.Logger,
 ) (events.GigPreviewProjectionSubscriber, error) {
 	return events.NewGigPreviewProjectionSubscriber(broker, svc, mapr, cfg.NATS, lg)
+}
+
+// ProvideGigReviewRatingSubscriber constructs the NATS subscriber that refreshes
+// owner gig previews after review rating updates.
+func ProvideGigReviewRatingSubscriber(
+	broker eventbroker.EventBroker,
+	svc app.GigService,
+	cfg *config.Config,
+	lg logging.Logger,
+) (events.GigReviewRatingSubscriber, error) {
+	return events.NewGigReviewRatingSubscriber(broker, svc, cfg.NATS, lg)
+}
+
+// ProvideGigOrderFundedSubscriber constructs the NATS subscriber that
+// refreshes owner gig previews after the canonical post-payment order event.
+func ProvideGigOrderFundedSubscriber(
+	broker eventbroker.EventBroker,
+	svc app.GigService,
+	cfg *config.Config,
+	lg logging.Logger,
+) (events.GigOrderCountSubscriber, error) {
+	return events.NewGigOrderFundedSubscriber(broker, svc, cfg.NATS, lg)
 }
 
 // ProvideGRPCServer constructs the gRPC draft workflow server exposed by
@@ -113,6 +139,64 @@ func InvokeSubscribeGigPreviewProjection(
 
 			if err := subscriber.Subscribe(runCtx); err != nil {
 				lg.Error("subscribe to gig preview projection failed", logging.Err(err))
+				cancel()
+				return err
+			}
+			return nil
+		},
+		OnStop: func(context.Context) error {
+			if cancel != nil {
+				cancel()
+			}
+			return nil
+		},
+	})
+}
+
+// InvokeSubscribeGigReviewRating starts the gig review rating pull consumer.
+func InvokeSubscribeGigReviewRating(
+	lc fx.Lifecycle,
+	subscriber events.GigReviewRatingSubscriber,
+	lg logging.Logger,
+) {
+	var cancel context.CancelFunc
+
+	lc.Append(fx.Hook{
+		OnStart: func(context.Context) error {
+			runCtx, runCancel := context.WithCancel(context.Background())
+			cancel = runCancel
+
+			if err := subscriber.Subscribe(runCtx); err != nil {
+				lg.Error("subscribe to gig review rating failed", logging.Err(err))
+				cancel()
+				return err
+			}
+			return nil
+		},
+		OnStop: func(context.Context) error {
+			if cancel != nil {
+				cancel()
+			}
+			return nil
+		},
+	})
+}
+
+// InvokeSubscribeGigOrderFunded starts the gig order count pull consumer.
+func InvokeSubscribeGigOrderFunded(
+	lc fx.Lifecycle,
+	subscriber events.GigOrderCountSubscriber,
+	lg logging.Logger,
+) {
+	var cancel context.CancelFunc
+
+	lc.Append(fx.Hook{
+		OnStart: func(context.Context) error {
+			runCtx, runCancel := context.WithCancel(context.Background())
+			cancel = runCancel
+
+			if err := subscriber.Subscribe(runCtx); err != nil {
+				lg.Error("subscribe to gig order funded failed", logging.Err(err))
 				cancel()
 				return err
 			}

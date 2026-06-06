@@ -213,8 +213,8 @@ var _ = Describe("redis repository", func() {
 		window0, err := repo.ListPreviewWindow(context.Background(), "user-1", 0)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(window0.Gigs).To(HaveLen(2))
-		Expect(window0.Gigs[0].ID).To(Equal("gig-1"))
-		Expect(window0.Gigs[1].ID).To(Equal("gig-2"))
+		Expect(window0.Gigs[0].ID).To(Equal("gig-2"))
+		Expect(window0.Gigs[1].ID).To(Equal("gig-1"))
 
 		window1, err := repo.ListPreviewWindow(context.Background(), "user-1", 1)
 		Expect(err).NotTo(HaveOccurred())
