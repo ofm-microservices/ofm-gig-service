@@ -9,6 +9,7 @@ var (
 	ErrEmptyNATSURL                 = errors.New("nats url is empty")
 	ErrNilLogger                    = errors.New("logger is nil")
 	ErrNilBroker                    = errors.New("event broker is nil")
+	ErrNilGigService                = errors.New("gig service is nil")
 	ErrNilProjectionWriter          = errors.New("projection writer is nil")
 	ErrNilMessageMapper             = errors.New("message mapper is nil")
 	ErrInvalidGigPayload            = errors.New("invalid gig payload")

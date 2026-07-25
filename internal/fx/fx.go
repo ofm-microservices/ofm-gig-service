@@ -6,11 +6,18 @@ import "go.uber.org/fx"
 var Module = fx.Options(
 	ConfigModule,
 	LoggerModule,
+	TracingModule,
+	MetricsModule,
 	AppModule,
 	StorageModule,
 	MessagingModule,
 	FileClientModule,
+	PaymentClientModule,
+	UserClientModule,
+	AnalyticsModule,
 	RepoModule,
+	OrderClientModule,
+	ReviewClientModule,
 	ServiceModule,
 	PresentationModule,
 )

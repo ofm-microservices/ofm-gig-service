@@ -10,8 +10,10 @@ func MapGigRowToDomain(row model.GigRow, packages []model.GigPackageRow, questio
 	gig := &domain.Gig{
 		ID:                    row.ID,
 		FreelancerID:          row.FreelancerID,
+		SellerUsername:        row.SellerUsername,
 		Slug:                  row.Slug,
 		Title:                 row.Title,
+		ShortInfo:             row.ShortInfo,
 		Description:           row.Description,
 		CategoryID:            row.CategoryID,
 		Currency:              row.Currency,

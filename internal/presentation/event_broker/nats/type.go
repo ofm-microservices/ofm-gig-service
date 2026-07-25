@@ -7,12 +7,30 @@ import (
 	eventbroker "gig-service/internal/presentation/event_broker"
 
 	"github.com/nats-io/nats.go"
-	"github.com/ofm-microseervices/ofm-common/pkg/logging"
+	"github.com/ofm-microservices/ofm-common/pkg/logging"
 )
 
 // GigProjectionSubscriber consumes gig lifecycle events from NATS and writes
 // the gig read model.
 type GigProjectionSubscriber interface {
+	Subscribe(ctx context.Context) error
+}
+
+// GigPreviewProjectionSubscriber consumes publish-time preview projection
+// events from NATS and appends them to the freelancer preview windows.
+type GigPreviewProjectionSubscriber interface {
+	Subscribe(ctx context.Context) error
+}
+
+// GigReviewRatingSubscriber consumes gig rating update events from NATS and
+// refreshes the owner gig preview cache.
+type GigReviewRatingSubscriber interface {
+	Subscribe(ctx context.Context) error
+}
+
+// GigOrderCountSubscriber consumes order lifecycle events from NATS and
+// refreshes the owner gig preview cache order count.
+type GigOrderCountSubscriber interface {
 	Subscribe(ctx context.Context) error
 }
 

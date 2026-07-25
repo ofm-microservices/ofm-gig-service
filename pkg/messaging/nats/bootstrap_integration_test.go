@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"gig-service/config"
-	"github.com/ofm-microseervices/ofm-common/pkg/logging"
+	"github.com/ofm-microservices/ofm-common/pkg/logging"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/testcontainers/testcontainers-go"
@@ -56,9 +56,12 @@ var _ = Describe("nats bootstrap integration", func() {
 		defer conn.Close()
 
 		Expect(EnsureStream(config.NATSConfig{
-			URL:                 natsBootstrapURL,
-			GigEventsStream:     "GIG_EVENTS",
-			GigPublishedSubject: "gig.published",
+			URL:                         natsBootstrapURL,
+			GigEventsStream:             "GIG_EVENTS",
+			GigPublishedSubject:         "gig.published",
+			GigProjectionSubject:        "gig.projection.requested",
+			GigPreviewProjectionSubject: "gig.preview.projection.requested",
+			GigViewedSubject:            "gig.viewed",
 		}, natsBootstrapLogger)).To(Succeed())
 
 		js, err := conn.JetStream()
@@ -66,6 +69,9 @@ var _ = Describe("nats bootstrap integration", func() {
 		info, err := js.StreamInfo("GIG_EVENTS")
 		Expect(err).NotTo(HaveOccurred())
 		Expect(info.Config.Subjects).To(ContainElement("gig.published"))
+		Expect(info.Config.Subjects).To(ContainElement("gig.projection.requested"))
+		Expect(info.Config.Subjects).To(ContainElement("gig.preview.projection.requested"))
+		Expect(info.Config.Subjects).To(ContainElement("gig.viewed"))
 	})
 
 	It("wraps invalid connection parameters", func() {

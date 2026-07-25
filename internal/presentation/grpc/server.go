@@ -4,11 +4,18 @@ import (
 	"context"
 	"fmt"
 	"gig-service/config"
+	"gig-service/internal/domain"
 	"net"
+	"strings"
+	"sync"
 
-	"github.com/ofm-microseervices/ofm-common/pkg/logging"
-	gigv1 "github.com/ofm-microseervices/ofm-common/proto/gig/v1"
+	"github.com/google/uuid"
+	"github.com/ofm-microservices/ofm-common/pkg/logging"
+	"github.com/ofm-microservices/ofm-common/pkg/observability/metrics"
+	gigv1 "github.com/ofm-microservices/ofm-common/proto/gig/v1"
+	otelgrpc "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
+	"time"
 )
 
 type server struct {
@@ -19,6 +26,8 @@ type server struct {
 	mapr     GigMapper
 	srv      *grpc.Server
 	listener net.Listener
+	started  chan struct{}
+	once     sync.Once
 }
 
 // NewServer constructs the gig-service gRPC draft workflow server.
@@ -30,13 +39,17 @@ func NewServer(svc GigService, cfg config.GRPCConfig, log logging.Logger) (Serve
 		return nil, ErrNilLogger
 	}
 
-	grpcSrv := grpc.NewServer()
+	grpcSrv := grpc.NewServer(
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
+		grpc.UnaryInterceptor(metrics.UnaryServerInterceptor()),
+	)
 	s := &server{
 		svc:  svc,
 		cfg:  cfg,
 		mapr: newGigMapper(log.With(logging.String("module", "grpc-mapper"))),
 		log:  log.With(logging.String("module", "grpc-server")),
 		srv:  grpcSrv,
+		started: make(chan struct{}),
 	}
 	gigv1.RegisterGigCommandServiceServer(grpcSrv, s)
 	return s, nil
@@ -51,6 +64,9 @@ func (s *server) Start() error {
 	}
 
 	s.listener = lis
+	s.once.Do(func() {
+		close(s.started)
+	})
 	s.log.Info("starting grpc server", logging.String("addr", addr))
 	return s.srv.Serve(lis)
 }
@@ -70,8 +86,18 @@ func (s *server) Shutdown(context.Context) error {
 // CreateDraft creates a server-side gig draft for the authenticated
 // freelancer.
 func (s *server) CreateDraft(ctx context.Context, req *gigv1.CreateDraftRequest) (*gigv1.CreateDraftResponse, error) {
+	started := time.Now()
+	log := logging.WithContext(ctx, s.log)
 	gig, err := s.svc.CreateDraft(ctx, req.GetFreelancerId())
 	if err != nil {
+		log.Error("create draft failed",
+			logging.Operation("grpc.gig.create_draft"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("freelancer_id", req.GetFreelancerId()),
+			logging.Err(err),
+		)
 		return nil, s.mapr.ToError(err)
 	}
 
@@ -80,8 +106,19 @@ func (s *server) CreateDraft(ctx context.Context, req *gigv1.CreateDraftRequest)
 
 // UpdateBasicInfo updates the gig's public metadata.
 func (s *server) UpdateBasicInfo(ctx context.Context, req *gigv1.UpdateBasicInfoRequest) (*gigv1.UpdateBasicInfoResponse, error) {
+	started := time.Now()
+	log := logging.WithContext(ctx, s.log)
 	gig, err := s.svc.UpdateBasicInfo(ctx, req.GetGigId(), req.GetFreelancerId(), s.mapr.ToUpdateBasicInfoParams(req))
 	if err != nil {
+		log.Error("update basic info failed",
+			logging.Operation("grpc.gig.update_basic_info"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", req.GetGigId()),
+			logging.String("freelancer_id", req.GetFreelancerId()),
+			logging.Err(err),
+		)
 		return nil, s.mapr.ToError(err)
 	}
 
@@ -90,8 +127,19 @@ func (s *server) UpdateBasicInfo(ctx context.Context, req *gigv1.UpdateBasicInfo
 
 // ReplacePackages replaces all gig package tiers.
 func (s *server) ReplacePackages(ctx context.Context, req *gigv1.ReplacePackagesRequest) (*gigv1.ReplacePackagesResponse, error) {
+	started := time.Now()
+	log := logging.WithContext(ctx, s.log)
 	gig, err := s.svc.ReplacePackages(ctx, req.GetGigId(), req.GetFreelancerId(), s.mapr.ToReplacePackagesParams(req))
 	if err != nil {
+		log.Error("replace packages failed",
+			logging.Operation("grpc.gig.replace_packages"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", req.GetGigId()),
+			logging.String("freelancer_id", req.GetFreelancerId()),
+			logging.Err(err),
+		)
 		return nil, s.mapr.ToError(err)
 	}
 
@@ -100,8 +148,19 @@ func (s *server) ReplacePackages(ctx context.Context, req *gigv1.ReplacePackages
 
 // ReplaceQuestions replaces the gig requirements questions.
 func (s *server) ReplaceQuestions(ctx context.Context, req *gigv1.ReplaceQuestionsRequest) (*gigv1.ReplaceQuestionsResponse, error) {
+	started := time.Now()
+	log := logging.WithContext(ctx, s.log)
 	gig, err := s.svc.ReplaceQuestions(ctx, req.GetGigId(), req.GetFreelancerId(), s.mapr.ToReplaceQuestionsParams(req))
 	if err != nil {
+		log.Error("replace questions failed",
+			logging.Operation("grpc.gig.replace_questions"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", req.GetGigId()),
+			logging.String("freelancer_id", req.GetFreelancerId()),
+			logging.Err(err),
+		)
 		return nil, s.mapr.ToError(err)
 	}
 
@@ -110,8 +169,19 @@ func (s *server) ReplaceQuestions(ctx context.Context, req *gigv1.ReplaceQuestio
 
 // ReplaceMedia replaces the gig media references.
 func (s *server) ReplaceMedia(ctx context.Context, req *gigv1.ReplaceMediaRequest) (*gigv1.ReplaceMediaResponse, error) {
+	started := time.Now()
+	log := logging.WithContext(ctx, s.log)
 	gig, err := s.svc.ReplaceMedia(ctx, req.GetGigId(), req.GetFreelancerId(), s.mapr.ToReplaceMediaParams(req))
 	if err != nil {
+		log.Error("replace media failed",
+			logging.Operation("grpc.gig.replace_media"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", req.GetGigId()),
+			logging.String("freelancer_id", req.GetFreelancerId()),
+			logging.Err(err),
+		)
 		return nil, s.mapr.ToError(err)
 	}
 
@@ -120,20 +190,168 @@ func (s *server) ReplaceMedia(ctx context.Context, req *gigv1.ReplaceMediaReques
 
 // GetDraft returns the current gig draft state.
 func (s *server) GetDraft(ctx context.Context, req *gigv1.GetDraftRequest) (*gigv1.GetDraftResponse, error) {
+	started := time.Now()
+	log := logging.WithContext(ctx, s.log)
 	gig, err := s.svc.GetByID(ctx, req.GetGigId(), req.GetFreelancerId())
 	if err != nil {
+		log.Error("get draft failed",
+			logging.Operation("grpc.gig.get_draft"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", req.GetGigId()),
+			logging.String("freelancer_id", req.GetFreelancerId()),
+			logging.Err(err),
+		)
 		return nil, s.mapr.ToError(err)
 	}
 
 	return &gigv1.GetDraftResponse{Gig: s.mapr.ToGigResponse(gig)}, nil
 }
 
+// GetOrderStartSnapshot returns the published gig snapshot for the order wizard.
+func (s *server) GetOrderStartSnapshot(ctx context.Context, req *gigv1.GetOrderStartSnapshotRequest) (*gigv1.GetOrderStartSnapshotResponse, error) {
+	started := time.Now()
+	log := logging.WithContext(ctx, s.log)
+	snapshot, err := s.svc.GetOrderStartSnapshot(ctx, req.GetGigId(), req.GetPackageId())
+	if err != nil {
+		log.Error("get order start snapshot failed",
+			logging.Operation("grpc.gig.get_order_start_snapshot"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", req.GetGigId()),
+			logging.String("package_id", req.GetPackageId()),
+			logging.Err(err),
+		)
+		return nil, s.mapr.ToError(err)
+	}
+
+	return &gigv1.GetOrderStartSnapshotResponse{Snapshot: s.mapr.ToOrderStartSnapshot(snapshot)}, nil
+}
+
+// GetGigBySlug returns the public gig detail view for the provided slug.
+func (s *server) GetGigBySlug(ctx context.Context, req *gigv1.GetGigBySlugRequest) (*gigv1.GetGigBySlugResponse, error) {
+	started := time.Now()
+	log := logging.WithContext(ctx, s.log)
+	gigID, err := parseGigIDFromSlug(req.GetSlug())
+	if err != nil {
+		log.Error("get gig by slug failed",
+			logging.Operation("grpc.gig.get_by_slug"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("slug", req.GetSlug()),
+			logging.Err(err),
+		)
+		return nil, s.mapr.ToError(err)
+	}
+
+	gig, err := s.svc.GetPublicByID(ctx, gigID)
+	if err != nil {
+		log.Error("get gig by slug failed",
+			logging.Operation("grpc.gig.get_by_slug"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("slug", req.GetSlug()),
+			logging.String("gig_id", gigID),
+			logging.Err(err),
+		)
+		return nil, s.mapr.ToError(err)
+	}
+
+	return s.mapr.ToGetGigBySlugResponse(gig), nil
+}
+
+// GetPreviewGigsByFreelancerUsername returns the freelancer profile gig preview list.
+func (s *server) GetPreviewGigsByFreelancerUsername(ctx context.Context, req *gigv1.GetPreviewGigsByFreelancerUsernameRequest) (*gigv1.GetPreviewGigsByFreelancerUsernameResponse, error) {
+	started := time.Now()
+	log := logging.WithContext(ctx, s.log)
+	result, err := s.svc.GetPreviewGigsByFreelancerUsername(ctx, domain.ListPreviewGigsQuery{
+		SellerUsername: req.GetUsername(),
+		Page:           int(req.GetPage()),
+		Limit:          int(req.GetLimit()),
+	})
+	if err != nil {
+		log.Error("get preview gigs by freelancer username failed",
+			logging.Operation("grpc.gig.get_preview_by_username"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("username", req.GetUsername()),
+			logging.Err(err),
+		)
+		return nil, s.mapr.ToError(err)
+	}
+
+	return s.mapr.ToGetPreviewGigsByFreelancerUsernameResponse(result), nil
+}
+
+// GetMyGigs returns the authenticated owner's gig preview list.
+func (s *server) GetMyGigs(ctx context.Context, req *gigv1.GetMyGigsRequest) (*gigv1.GetMyGigsResponse, error) {
+	started := time.Now()
+	log := logging.WithContext(ctx, s.log)
+	result, err := s.svc.GetMyGigs(ctx, domain.ListMyGigsQuery{
+		UserID: req.GetUserId(),
+		Status: req.GetStatus(),
+		Sort:   req.GetSort(),
+		Order:  req.GetOrder(),
+		Page:   int(req.GetPage()),
+		Limit:  int(req.GetLimit()),
+	})
+	if err != nil {
+		log.Error("get my gigs failed",
+			logging.Operation("grpc.gig.get_my_gigs"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("user_id", req.GetUserId()),
+			logging.Err(err),
+		)
+		return nil, s.mapr.ToError(err)
+	}
+
+	return s.mapr.ToGetMyGigsResponse(result), nil
+}
+
 // Publish makes the gig visible and emits the published event.
 func (s *server) Publish(ctx context.Context, req *gigv1.PublishRequest) (*gigv1.PublishResponse, error) {
-	gig, err := s.svc.Publish(ctx, req.GetGigId(), req.GetFreelancerId())
+	started := time.Now()
+	log := logging.WithContext(ctx, s.log)
+	gig, err := s.svc.Publish(ctx, req.GetGigId(), req.GetFreelancerId(), req.GetUsername())
 	if err != nil {
+		log.Error("publish failed",
+			logging.Operation("grpc.gig.publish"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.DurationMS(time.Since(started)),
+			logging.String("gig_id", req.GetGigId()),
+			logging.String("freelancer_id", req.GetFreelancerId()),
+			logging.String("username", req.GetUsername()),
+			logging.Err(err),
+		)
 		return nil, s.mapr.ToError(err)
 	}
 
 	return &gigv1.PublishResponse{Gig: s.mapr.ToGigResponse(gig)}, nil
+}
+
+func parseGigIDFromSlug(slug string) (string, error) {
+	slug = strings.TrimSpace(slug)
+	if slug == "" {
+		return "", domain.ErrInvalidGigSlug
+	}
+	if len(slug) <= 37 {
+		return "", domain.ErrInvalidGigSlug
+	}
+	if slug[len(slug)-37] != '-' {
+		return "", domain.ErrInvalidGigSlug
+	}
+	gigID := slug[len(slug)-36:]
+	parsed, err := uuid.Parse(gigID)
+	if err != nil || parsed.Version() != 7 {
+		return "", domain.ErrInvalidGigSlug
+	}
+	return gigID, nil
 }

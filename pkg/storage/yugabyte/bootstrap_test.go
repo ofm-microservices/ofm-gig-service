@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"gig-service/config"
-	"github.com/golang-migrate/migrate/v4"
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/golang-migrate/migrate/v4"
 	"github.com/jmoiron/sqlx"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -72,8 +72,8 @@ var _ = Describe("yugabyte bootstrap", func() {
 			Password:        "pass",
 			Name:            "gig_service",
 			SSLMode:         "disable",
-			MigrationsPath:   "file://migration/yugabyte",
-			MigrationsTable:  "schema_migrations_gig_service",
+			MigrationsPath:  "file://migration/yugabyte",
+			MigrationsTable: "schema_migrations_gig_service",
 		})).To(Succeed())
 	})
 

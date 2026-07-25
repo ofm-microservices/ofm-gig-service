@@ -69,3 +69,48 @@ func (mr *MockGigEventMapperMockRecorder) ToPublishedPayload(gig any) *gomock.Ca
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ToPublishedPayload", reflect.TypeOf((*MockGigEventMapper)(nil).ToPublishedPayload), gig)
 }
+
+// ToViewedPayload mocks base method.
+func (m *MockGigEventMapper) ToViewedPayload(gig *domain.Gig) ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ToViewedPayload", gig)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ToViewedPayload indicates an expected call of ToViewedPayload.
+func (mr *MockGigEventMapperMockRecorder) ToViewedPayload(gig any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ToViewedPayload", reflect.TypeOf((*MockGigEventMapper)(nil).ToViewedPayload), gig)
+}
+
+// FromReadModelPayload mocks base method.
+func (m *MockGigEventMapper) FromReadModelPayload(payload []byte) (*domain.Gig, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FromReadModelPayload", payload)
+	ret0, _ := ret[0].(*domain.Gig)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FromReadModelPayload indicates an expected call of FromReadModelPayload.
+func (mr *MockGigEventMapperMockRecorder) FromReadModelPayload(payload any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FromReadModelPayload", reflect.TypeOf((*MockGigEventMapper)(nil).FromReadModelPayload), payload)
+}
+
+// ToReadModelPayload mocks base method.
+func (m *MockGigEventMapper) ToReadModelPayload(gig *domain.Gig) ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ToReadModelPayload", gig)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ToReadModelPayload indicates an expected call of ToReadModelPayload.
+func (mr *MockGigEventMapperMockRecorder) ToReadModelPayload(gig any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ToReadModelPayload", reflect.TypeOf((*MockGigEventMapper)(nil).ToReadModelPayload), gig)
+}

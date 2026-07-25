@@ -5,7 +5,7 @@ import (
 
 	"gig-service/config"
 	filegrpc "gig-service/internal/infra/file/grpc"
-	"github.com/ofm-microseervices/ofm-common/pkg/logging"
+	"github.com/ofm-microservices/ofm-common/pkg/logging"
 
 	"go.uber.org/fx"
 )

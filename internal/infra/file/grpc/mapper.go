@@ -4,8 +4,8 @@ import (
 	"errors"
 	"gig-service/internal/domain"
 
-	"github.com/ofm-microseervices/ofm-common/pkg/logging"
-	filev1 "github.com/ofm-microseervices/ofm-common/proto/file/v1"
+	"github.com/ofm-microservices/ofm-common/pkg/logging"
+	filev1 "github.com/ofm-microservices/ofm-common/proto/file/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -48,6 +48,41 @@ func (m *fileMapper) ToUploadFilesResponse(res *filev1.UploadFilesResponse) []st
 	return ids
 }
 
+func (m *fileMapper) ToGetFileURLRequest(fileID string) *filev1.GetFileURLRequest {
+	return &filev1.GetFileURLRequest{FileId: fileID}
+}
+
+func (m *fileMapper) ToGetFileURLResponse(res *filev1.GetFileURLResponse) string {
+	if res == nil {
+		return ""
+	}
+	return res.GetUrl()
+}
+
+func (m *fileMapper) ToGetFileURLsRequest(fileIDs []string) *filev1.GetFileURLsRequest {
+	return &filev1.GetFileURLsRequest{FileIds: fileIDs}
+}
+
+func (m *fileMapper) ToGetFileURLsResponse(res *filev1.GetFileURLsResponse) map[string]string {
+	if res == nil || len(res.GetFileUrls()) == 0 {
+		return nil
+	}
+
+	urls := make(map[string]string, len(res.GetFileUrls()))
+	for _, item := range res.GetFileUrls() {
+		if item == nil {
+			continue
+		}
+		urls[item.GetFileId()] = item.GetUrl()
+	}
+
+	if len(urls) == 0 {
+		return nil
+	}
+
+	return urls
+}
+
 func (m *fileMapper) ToDeleteFileRequest(fileID string) *filev1.DeleteFileRequest {
 	return &filev1.DeleteFileRequest{FileId: fileID}
 }
@@ -67,7 +102,12 @@ func (m *fileMapper) ToError(err error) error {
 		if errors.Is(err, domain.ErrInvalidMediaUpload) || errors.Is(err, domain.ErrInvalidFileID) {
 			return err
 		}
-		m.log.Error("file-service request failed", logging.Err(err))
+		m.log.Error("file-service request failed",
+			logging.Operation("grpc.file.map_error"),
+			logging.Attempt(1),
+			logging.Retryable(false),
+			logging.Err(err),
+		)
 		return err
 	}
 }

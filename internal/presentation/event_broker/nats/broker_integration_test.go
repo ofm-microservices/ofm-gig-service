@@ -8,7 +8,7 @@ import (
 
 	"gig-service/config"
 	"github.com/nats-io/nats.go"
-	"github.com/ofm-microseervices/ofm-common/pkg/logging"
+	"github.com/ofm-microservices/ofm-common/pkg/logging"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/testcontainers/testcontainers-go"
@@ -56,26 +56,27 @@ var _ = Describe("nats broker integration", func() {
 
 	BeforeEach(func() {
 		cfg = config.NATSConfig{
-			URL:                 brokerIntegrationURL,
-			GigEventsStream:     "GIG_EVENTS",
-			GigPublishedSubject: "gig.published",
-			GigProjectionDurable: "gig_projection",
-			GigProjectionBatchSize: 2,
-			GigProjectionMaxWait: 50 * time.Millisecond,
-			GigProjectionWorkers: 1,
-			GigProjectionQueueSize: 4,
-			GigProjectionAckWait: 2 * time.Second,
-			GigProjectionMaxDeliver: 3,
-			GigProjectionAdaptiveEnabled: true,
-			GigProjectionAdaptiveCheckInterval: time.Millisecond,
-			GigProjectionAdaptiveMediumPending: 1,
-			GigProjectionAdaptiveHighPending: 2,
-			GigProjectionAdaptiveLowBatchSize: 1,
-			GigProjectionAdaptiveLowMaxWait: 20 * time.Millisecond,
+			URL:                                  brokerIntegrationURL,
+			GigEventsStream:                      "GIG_EVENTS",
+			GigPublishedSubject:                  "gig.published",
+			GigViewedSubject:                     "gig.viewed",
+			GigProjectionDurable:                 "gig_projection",
+			GigProjectionBatchSize:               2,
+			GigProjectionMaxWait:                 50 * time.Millisecond,
+			GigProjectionWorkers:                 1,
+			GigProjectionQueueSize:               4,
+			GigProjectionAckWait:                 2 * time.Second,
+			GigProjectionMaxDeliver:              3,
+			GigProjectionAdaptiveEnabled:         true,
+			GigProjectionAdaptiveCheckInterval:   time.Millisecond,
+			GigProjectionAdaptiveMediumPending:   1,
+			GigProjectionAdaptiveHighPending:     2,
+			GigProjectionAdaptiveLowBatchSize:    1,
+			GigProjectionAdaptiveLowMaxWait:      20 * time.Millisecond,
 			GigProjectionAdaptiveMediumBatchSize: 2,
-			GigProjectionAdaptiveMediumMaxWait: 10 * time.Millisecond,
-			GigProjectionAdaptiveHighBatchSize: 3,
-			GigProjectionAdaptiveHighMaxWait: 5 * time.Millisecond,
+			GigProjectionAdaptiveMediumMaxWait:   10 * time.Millisecond,
+			GigProjectionAdaptiveHighBatchSize:   3,
+			GigProjectionAdaptiveHighMaxWait:     5 * time.Millisecond,
 		}
 
 		rawConn, err := nats.Connect(cfg.URL)
@@ -86,7 +87,7 @@ var _ = Describe("nats broker integration", func() {
 		Expect(err).NotTo(HaveOccurred())
 		_, err = js.AddStream(&nats.StreamConfig{
 			Name:      cfg.GigEventsStream,
-			Subjects:  []string{cfg.GigPublishedSubject},
+			Subjects:  []string{cfg.GigPublishedSubject, cfg.GigViewedSubject},
 			Storage:   nats.FileStorage,
 			Retention: nats.LimitsPolicy,
 		})

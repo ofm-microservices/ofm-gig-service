@@ -13,6 +13,7 @@ import (
 	context "context"
 	domain "gig-service/internal/domain"
 	reflect "reflect"
+	time "time"
 
 	gomock "go.uber.org/mock/gomock"
 )
@@ -69,6 +70,36 @@ func (m *MockGigRepository) GetByID(ctx context.Context, gigID string) (*domain.
 func (mr *MockGigRepositoryMockRecorder) GetByID(ctx, gigID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByID", reflect.TypeOf((*MockGigRepository)(nil).GetByID), ctx, gigID)
+}
+
+// ListAll mocks base method.
+func (m *MockGigRepository) ListAll(ctx context.Context) ([]*domain.Gig, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListAll", ctx)
+	ret0, _ := ret[0].([]*domain.Gig)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListAll indicates an expected call of ListAll.
+func (mr *MockGigRepositoryMockRecorder) ListAll(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAll", reflect.TypeOf((*MockGigRepository)(nil).ListAll), ctx)
+}
+
+// ListPublishedBySellerUsername mocks base method.
+func (m *MockGigRepository) ListPublishedBySellerUsername(ctx context.Context, query domain.ListPreviewGigsQuery) ([]*domain.Gig, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListPublishedBySellerUsername", ctx, query)
+	ret0, _ := ret[0].([]*domain.Gig)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListPublishedBySellerUsername indicates an expected call of ListPublishedBySellerUsername.
+func (mr *MockGigRepositoryMockRecorder) ListPublishedBySellerUsername(ctx, query any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPublishedBySellerUsername", reflect.TypeOf((*MockGigRepository)(nil).ListPublishedBySellerUsername), ctx, query)
 }
 
 // Publish mocks base method.
@@ -146,6 +177,21 @@ func (mr *MockGigRepositoryMockRecorder) UpdateBasicInfo(ctx, gigID, params any)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateBasicInfo", reflect.TypeOf((*MockGigRepository)(nil).UpdateBasicInfo), ctx, gigID, params)
 }
 
+// UpdateSellerUsername mocks base method.
+func (m *MockGigRepository) UpdateSellerUsername(ctx context.Context, gigID, sellerUsername string) (*domain.Gig, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateSellerUsername", ctx, gigID, sellerUsername)
+	ret0, _ := ret[0].(*domain.Gig)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateSellerUsername indicates an expected call of UpdateSellerUsername.
+func (mr *MockGigRepositoryMockRecorder) UpdateSellerUsername(ctx, gigID, sellerUsername any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateSellerUsername", reflect.TypeOf((*MockGigRepository)(nil).UpdateSellerUsername), ctx, gigID, sellerUsername)
+}
+
 // MockGigReadRepository is a mock of GigReadRepository interface.
 type MockGigReadRepository struct {
 	ctrl     *gomock.Controller
@@ -184,6 +230,182 @@ func (mr *MockGigReadRepositoryMockRecorder) DeleteByID(ctx, gigID any) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteByID", reflect.TypeOf((*MockGigReadRepository)(nil).DeleteByID), ctx, gigID)
 }
 
+// GetByID mocks base method.
+func (m *MockGigReadRepository) GetByID(ctx context.Context, gigID string) (*domain.Gig, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetByID", ctx, gigID)
+	ret0, _ := ret[0].(*domain.Gig)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetByID indicates an expected call of GetByID.
+func (mr *MockGigReadRepositoryMockRecorder) GetByID(ctx, gigID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByID", reflect.TypeOf((*MockGigReadRepository)(nil).GetByID), ctx, gigID)
+}
+
+// GetPopularitySnapshot mocks base method.
+func (m *MockGigReadRepository) GetPopularitySnapshot(ctx context.Context, gigID string) (*domain.GigPopularitySnapshot, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPopularitySnapshot", ctx, gigID)
+	ret0, _ := ret[0].(*domain.GigPopularitySnapshot)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPopularitySnapshot indicates an expected call of GetPopularitySnapshot.
+func (mr *MockGigReadRepositoryMockRecorder) GetPopularitySnapshot(ctx, gigID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPopularitySnapshot", reflect.TypeOf((*MockGigReadRepository)(nil).GetPopularitySnapshot), ctx, gigID)
+}
+
+// GetPreviewByID mocks base method.
+func (m *MockGigReadRepository) GetPreviewByID(ctx context.Context, gigID string) (*domain.GigPreview, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPreviewByID", ctx, gigID)
+	ret0, _ := ret[0].(*domain.GigPreview)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPreviewByID indicates an expected call of GetPreviewByID.
+func (mr *MockGigReadRepositoryMockRecorder) GetPreviewByID(ctx, gigID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPreviewByID", reflect.TypeOf((*MockGigReadRepository)(nil).GetPreviewByID), ctx, gigID)
+}
+
+// ListOwnerPreviewGigs mocks base method.
+func (m *MockGigReadRepository) ListOwnerPreviewGigs(ctx context.Context, userID string) ([]*domain.GigPreview, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListOwnerPreviewGigs", ctx, userID)
+	ret0, _ := ret[0].([]*domain.GigPreview)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListOwnerPreviewGigs indicates an expected call of ListOwnerPreviewGigs.
+func (mr *MockGigReadRepositoryMockRecorder) ListOwnerPreviewGigs(ctx, userID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListOwnerPreviewGigs", reflect.TypeOf((*MockGigReadRepository)(nil).ListOwnerPreviewGigs), ctx, userID)
+}
+
+// UpsertOwnerPreview mocks base method.
+func (m *MockGigReadRepository) UpsertOwnerPreview(ctx context.Context, userID string, gig *domain.GigPreview) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpsertOwnerPreview", ctx, userID, gig)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpsertOwnerPreview indicates an expected call of UpsertOwnerPreview.
+func (mr *MockGigReadRepositoryMockRecorder) UpsertOwnerPreview(ctx, userID, gig any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertOwnerPreview", reflect.TypeOf((*MockGigReadRepository)(nil).UpsertOwnerPreview), ctx, userID, gig)
+}
+
+// ListPopularitySnapshotsByGigIDs mocks base method.
+func (m *MockGigReadRepository) ListPopularitySnapshotsByGigIDs(ctx context.Context, gigIDs []string) (map[string]*domain.GigPopularitySnapshot, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListPopularitySnapshotsByGigIDs", ctx, gigIDs)
+	ret0, _ := ret[0].(map[string]*domain.GigPopularitySnapshot)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListPopularitySnapshotsByGigIDs indicates an expected call of ListPopularitySnapshotsByGigIDs.
+func (mr *MockGigReadRepositoryMockRecorder) ListPopularitySnapshotsByGigIDs(ctx, gigIDs any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPopularitySnapshotsByGigIDs", reflect.TypeOf((*MockGigReadRepository)(nil).ListPopularitySnapshotsByGigIDs), ctx, gigIDs)
+}
+
+// GetUserLookup mocks base method.
+func (m *MockGigReadRepository) GetUserLookup(ctx context.Context, username string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetUserLookup", ctx, username)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetUserLookup indicates an expected call of GetUserLookup.
+func (mr *MockGigReadRepositoryMockRecorder) GetUserLookup(ctx, username any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserLookup", reflect.TypeOf((*MockGigReadRepository)(nil).GetUserLookup), ctx, username)
+}
+
+// ListPopularitySnapshots mocks base method.
+func (m *MockGigReadRepository) ListPopularitySnapshots(ctx context.Context) ([]*domain.GigPopularitySnapshot, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListPopularitySnapshots", ctx)
+	ret0, _ := ret[0].([]*domain.GigPopularitySnapshot)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListPopularitySnapshots indicates an expected call of ListPopularitySnapshots.
+func (mr *MockGigReadRepositoryMockRecorder) ListPopularitySnapshots(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPopularitySnapshots", reflect.TypeOf((*MockGigReadRepository)(nil).ListPopularitySnapshots), ctx)
+}
+
+// ListPreviewWindow mocks base method.
+func (m *MockGigReadRepository) ListPreviewWindow(ctx context.Context, userID string, window int) (*domain.ListPreviewGigsResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListPreviewWindow", ctx, userID, window)
+	ret0, _ := ret[0].(*domain.ListPreviewGigsResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListPreviewWindow indicates an expected call of ListPreviewWindow.
+func (mr *MockGigReadRepositoryMockRecorder) ListPreviewWindow(ctx, userID, window any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPreviewWindow", reflect.TypeOf((*MockGigReadRepository)(nil).ListPreviewWindow), ctx, userID, window)
+}
+
+// AppendPreviewGig mocks base method.
+func (m *MockGigReadRepository) AppendPreviewGig(ctx context.Context, userID string, gig *domain.GigPreview, windowSize int, ttl time.Duration) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AppendPreviewGig", ctx, userID, gig, windowSize, ttl)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AppendPreviewGig indicates an expected call of AppendPreviewGig.
+func (mr *MockGigReadRepositoryMockRecorder) AppendPreviewGig(ctx, userID, gig, windowSize, ttl any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppendPreviewGig", reflect.TypeOf((*MockGigReadRepository)(nil).AppendPreviewGig), ctx, userID, gig, windowSize, ttl)
+}
+
+// SetPopularitySnapshot mocks base method.
+func (m *MockGigReadRepository) SetPopularitySnapshot(ctx context.Context, snapshot *domain.GigPopularitySnapshot) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetPopularitySnapshot", ctx, snapshot)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetPopularitySnapshot indicates an expected call of SetPopularitySnapshot.
+func (mr *MockGigReadRepositoryMockRecorder) SetPopularitySnapshot(ctx, snapshot any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPopularitySnapshot", reflect.TypeOf((*MockGigReadRepository)(nil).SetPopularitySnapshot), ctx, snapshot)
+}
+
+// SetUserLookup mocks base method.
+func (m *MockGigReadRepository) SetUserLookup(ctx context.Context, username, userID string, ttl time.Duration) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetUserLookup", ctx, username, userID, ttl)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetUserLookup indicates an expected call of SetUserLookup.
+func (mr *MockGigReadRepositoryMockRecorder) SetUserLookup(ctx, username, userID, ttl any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetUserLookup", reflect.TypeOf((*MockGigReadRepository)(nil).SetUserLookup), ctx, username, userID, ttl)
+}
+
 // Upsert mocks base method.
 func (m *MockGigReadRepository) Upsert(ctx context.Context, gig *domain.Gig) error {
 	m.ctrl.T.Helper()
@@ -196,4 +418,18 @@ func (m *MockGigReadRepository) Upsert(ctx context.Context, gig *domain.Gig) err
 func (mr *MockGigReadRepositoryMockRecorder) Upsert(ctx, gig any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Upsert", reflect.TypeOf((*MockGigReadRepository)(nil).Upsert), ctx, gig)
+}
+
+// UpsertPreviewWindow mocks base method.
+func (m *MockGigReadRepository) UpsertPreviewWindow(ctx context.Context, userID string, window int, gigs []*domain.GigPreview, hasMore bool, ttl time.Duration) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpsertPreviewWindow", ctx, userID, window, gigs, hasMore, ttl)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpsertPreviewWindow indicates an expected call of UpsertPreviewWindow.
+func (mr *MockGigReadRepositoryMockRecorder) UpsertPreviewWindow(ctx, userID, window, gigs, hasMore, ttl any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertPreviewWindow", reflect.TypeOf((*MockGigReadRepository)(nil).UpsertPreviewWindow), ctx, userID, window, gigs, hasMore, ttl)
 }

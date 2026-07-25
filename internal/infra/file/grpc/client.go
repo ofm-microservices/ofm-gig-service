@@ -5,8 +5,10 @@ import (
 
 	"gig-service/config"
 	"gig-service/internal/domain"
-	"github.com/ofm-microseervices/ofm-common/pkg/logging"
-	filev1 "github.com/ofm-microseervices/ofm-common/proto/file/v1"
+	"github.com/ofm-microservices/ofm-common/pkg/logging"
+	"github.com/ofm-microservices/ofm-common/pkg/observability/metrics"
+	filev1 "github.com/ofm-microservices/ofm-common/proto/file/v1"
+	otelgrpc "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	grpcpkg "google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -28,7 +30,12 @@ func NewFileService(cfg config.FileServiceConfig, log logging.Logger) (FileServi
 		return nil, ErrNilLogger
 	}
 
-	conn, err := grpcpkg.NewClient(cfg.Address, grpcpkg.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpcpkg.NewClient(
+		cfg.Address,
+		grpcpkg.WithTransportCredentials(insecure.NewCredentials()),
+		grpcpkg.WithStatsHandler(otelgrpc.NewClientHandler()),
+		grpcpkg.WithUnaryInterceptor(metrics.UnaryClientInterceptor()),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -48,6 +55,24 @@ func (c *client) UploadFiles(ctx context.Context, ownerID, prefix string, files 
 	}
 
 	return c.mapr.ToUploadFilesResponse(res), nil
+}
+
+func (c *client) GetFileURL(ctx context.Context, fileID string) (string, error) {
+	res, err := c.cl.GetFileURL(ctx, c.mapr.ToGetFileURLRequest(fileID))
+	if err != nil {
+		return "", c.mapr.ToError(err)
+	}
+
+	return c.mapr.ToGetFileURLResponse(res), nil
+}
+
+func (c *client) GetFileURLs(ctx context.Context, fileIDs []string) (map[string]string, error) {
+	res, err := c.cl.GetFileURLs(ctx, c.mapr.ToGetFileURLsRequest(fileIDs))
+	if err != nil {
+		return nil, c.mapr.ToError(err)
+	}
+
+	return c.mapr.ToGetFileURLsResponse(res), nil
 }
 
 func (c *client) DeleteFile(ctx context.Context, fileID string) error {

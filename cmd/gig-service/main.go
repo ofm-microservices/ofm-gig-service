@@ -10,11 +10,18 @@ func newApp() *fx.App {
 	return fx.New(
 		appfx.ConfigModule,
 		appfx.LoggerModule,
+		appfx.TracingModule,
+		appfx.MetricsModule,
 		appfx.AppModule,
 		appfx.StorageModule,
 		appfx.MessagingModule,
 		appfx.FileClientModule,
+		appfx.PaymentClientModule,
+		appfx.UserClientModule,
+		appfx.AnalyticsModule,
 		appfx.RepoModule,
+		appfx.OrderClientModule,
+		appfx.ReviewClientModule,
 		appfx.ServiceModule,
 		appfx.PresentationModule,
 	)

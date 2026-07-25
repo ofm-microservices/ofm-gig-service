@@ -5,7 +5,7 @@ import (
 	"gig-service/config"
 	rdb "gig-service/pkg/storage/redis"
 	ydb "gig-service/pkg/storage/yugabyte"
-	"github.com/ofm-microseervices/ofm-common/pkg/logging"
+	"github.com/ofm-microservices/ofm-common/pkg/logging"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/redis/go-redis/v9"

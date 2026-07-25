@@ -3,12 +3,12 @@ package repository
 const (
 	createGigDraftQuery = `
 		INSERT INTO gigs (
-			gig_id, freelancer_id, slug, status, picture_file_id,
+			gig_id, freelancer_id, seller_username, slug, status, picture_file_id,
 			basic_info_completed, packages_completed, requirements_completed, media_completed,
 			created_at, updated_at
 		)
-		VALUES ($1, $2, '', 'draft', '', FALSE, FALSE, FALSE, FALSE, NOW(), NOW())
-		RETURNING gig_id, freelancer_id, slug, title, description, category_id, currency, status,
+		VALUES ($1, $2, '', '', 'draft', '', FALSE, FALSE, FALSE, FALSE, NOW(), NOW())
+		RETURNING gig_id, freelancer_id, seller_username, slug, title, short_info, description, category_id, currency, status,
 			basic_info_completed, packages_completed, requirements_completed, media_completed, picture_file_id,
 			published_at, created_at, updated_at
 	`
@@ -16,14 +16,25 @@ const (
 	updateGigBasicInfoQuery = `
 		UPDATE gigs
 		SET title = $2,
-			slug = $3,
-			description = $4,
-			category_id = $5,
-			currency = $6,
+			short_info = $3,
+			slug = $4,
+			description = $5,
+			category_id = $6,
+			currency = $7,
 			basic_info_completed = TRUE,
 			updated_at = NOW()
 		WHERE gig_id = $1
-		RETURNING gig_id, freelancer_id, slug, title, description, category_id, currency, status,
+		RETURNING gig_id, freelancer_id, seller_username, slug, title, short_info, description, category_id, currency, status,
+			basic_info_completed, packages_completed, requirements_completed, media_completed, picture_file_id,
+			published_at, created_at, updated_at
+	`
+
+	updateGigSellerUsernameQuery = `
+		UPDATE gigs
+		SET seller_username = $2,
+			updated_at = NOW()
+		WHERE gig_id = $1
+		RETURNING gig_id, freelancer_id, seller_username, slug, title, short_info, description, category_id, currency, status,
 			basic_info_completed, packages_completed, requirements_completed, media_completed, picture_file_id,
 			published_at, created_at, updated_at
 	`
@@ -34,17 +45,34 @@ const (
 			published_at = NOW(),
 			updated_at = NOW()
 		WHERE gig_id = $1
-		RETURNING gig_id, freelancer_id, slug, title, description, category_id, currency, status,
+		RETURNING gig_id, freelancer_id, seller_username, slug, title, short_info, description, category_id, currency, status,
 			basic_info_completed, packages_completed, requirements_completed, media_completed, picture_file_id,
 			published_at, created_at, updated_at
 	`
 
 	getGigQuery = `
-		SELECT gig_id, freelancer_id, slug, title, description, category_id, currency, status,
+		SELECT gig_id, freelancer_id, seller_username, slug, title, short_info, description, category_id, currency, status,
 			basic_info_completed, packages_completed, requirements_completed, media_completed, picture_file_id,
 			published_at, created_at, updated_at
 		FROM gigs
 		WHERE gig_id = $1
+	`
+
+	listAllGigsQuery = `
+		SELECT gig_id, freelancer_id, seller_username, slug, title, short_info, description, category_id, currency, status,
+			basic_info_completed, packages_completed, requirements_completed, media_completed, picture_file_id,
+			published_at, created_at, updated_at
+		FROM gigs
+		ORDER BY created_at ASC, gig_id ASC
+	`
+
+	listPublishedBySellerUsernameQuery = `
+		SELECT gig_id, freelancer_id, seller_username, slug, title, short_info, description, category_id, currency, status,
+			basic_info_completed, packages_completed, requirements_completed, media_completed, picture_file_id,
+			published_at, created_at, updated_at
+		FROM gigs
+		WHERE seller_username = $1 AND status = 'published'
+		ORDER BY created_at DESC, gig_id DESC
 	`
 
 	deleteGigPackagesQuery = `DELETE FROM gig_packages WHERE gig_id = $1`

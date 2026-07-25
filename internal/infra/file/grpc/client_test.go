@@ -6,8 +6,8 @@ import (
 
 	"gig-service/config"
 	"gig-service/internal/domain"
-	filev1 "github.com/ofm-microseervices/ofm-common/proto/file/v1"
-	"github.com/ofm-microseervices/ofm-common/pkg/logging"
+	"github.com/ofm-microservices/ofm-common/pkg/logging"
+	filev1 "github.com/ofm-microservices/ofm-common/proto/file/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"google.golang.org/grpc"
@@ -16,11 +16,17 @@ import (
 )
 
 type fakeFileServiceClient struct {
-	uploadReq *filev1.UploadFilesRequest
-	deleteReq *filev1.DeleteFileRequest
-	uploadRes *filev1.UploadFilesResponse
-	uploadErr error
-	deleteErr error
+	uploadReq   *filev1.UploadFilesRequest
+	fileURLReq  *filev1.GetFileURLRequest
+	fileURLsReq *filev1.GetFileURLsRequest
+	deleteReq   *filev1.DeleteFileRequest
+	uploadRes   *filev1.UploadFilesResponse
+	fileURLRes  *filev1.GetFileURLResponse
+	fileURLsRes *filev1.GetFileURLsResponse
+	uploadErr   error
+	fileURLErr  error
+	fileURLsErr error
+	deleteErr   error
 }
 
 func (f *fakeFileServiceClient) UploadFile(context.Context, *filev1.UploadFileRequest, ...grpc.CallOption) (*filev1.UploadFileResponse, error) {
@@ -34,6 +40,16 @@ func (f *fakeFileServiceClient) UploadFiles(_ context.Context, req *filev1.Uploa
 
 func (f *fakeFileServiceClient) GetFile(context.Context, *filev1.GetFileRequest, ...grpc.CallOption) (*filev1.GetFileResponse, error) {
 	return nil, nil
+}
+
+func (f *fakeFileServiceClient) GetFileURL(_ context.Context, req *filev1.GetFileURLRequest, _ ...grpc.CallOption) (*filev1.GetFileURLResponse, error) {
+	f.fileURLReq = req
+	return f.fileURLRes, f.fileURLErr
+}
+
+func (f *fakeFileServiceClient) GetFileURLs(_ context.Context, req *filev1.GetFileURLsRequest, _ ...grpc.CallOption) (*filev1.GetFileURLsResponse, error) {
+	f.fileURLsReq = req
+	return f.fileURLsRes, f.fileURLsErr
 }
 
 func (f *fakeFileServiceClient) DeleteFile(_ context.Context, req *filev1.DeleteFileRequest, _ ...grpc.CallOption) (*filev1.DeleteFileResponse, error) {
@@ -59,6 +75,12 @@ var _ = Describe("file gRPC mapper", func() {
 
 		Expect(mapper.ToUploadFilesResponse(&filev1.UploadFilesResponse{Files: []*filev1.File{{FileId: "file-1"}}})).To(Equal([]string{"file-1"}))
 		Expect(mapper.ToUploadFilesResponse(nil)).To(BeNil())
+		Expect(mapper.ToGetFileURLRequest("file-1").FileId).To(Equal("file-1"))
+		Expect(mapper.ToGetFileURLResponse(&filev1.GetFileURLResponse{Url: "https://example.com"})).To(Equal("https://example.com"))
+		Expect(mapper.ToGetFileURLResponse(nil)).To(Equal(""))
+		Expect(mapper.ToGetFileURLsRequest([]string{"file-1", "file-2"}).GetFileIds()).To(Equal([]string{"file-1", "file-2"}))
+		Expect(mapper.ToGetFileURLsResponse(&filev1.GetFileURLsResponse{FileUrls: []*filev1.FileURL{{FileId: "file-1", Url: "https://example.com/1"}, {FileId: "file-2", Url: "https://example.com/2"}}})).To(Equal(map[string]string{"file-1": "https://example.com/1", "file-2": "https://example.com/2"}))
+		Expect(mapper.ToGetFileURLsResponse(nil)).To(BeNil())
 		Expect(mapper.ToDeleteFileRequest("file-1").FileId).To(Equal("file-1"))
 		Expect(mapper.ToError(status.Error(codes.InvalidArgument, "bad"))).To(MatchError(domain.ErrInvalidMediaUpload))
 		Expect(mapper.ToError(status.Error(codes.NotFound, "missing"))).To(MatchError(domain.ErrInvalidFileID))
@@ -111,6 +133,18 @@ var _ = Describe("file gRPC client", func() {
 
 		Expect(client.DeleteFile(context.Background(), "cover")).To(Succeed())
 		Expect(fake.deleteReq.FileId).To(Equal("cover"))
+
+		fake.fileURLRes = &filev1.GetFileURLResponse{FileId: "cover", Url: "https://example.com/cover.png"}
+		url, err := client.GetFileURL(context.Background(), "cover")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(url).To(Equal("https://example.com/cover.png"))
+		Expect(fake.fileURLReq.FileId).To(Equal("cover"))
+
+		fake.fileURLsRes = &filev1.GetFileURLsResponse{FileUrls: []*filev1.FileURL{{FileId: "cover", Url: "https://example.com/cover.png"}, {FileId: "gallery", Url: "https://example.com/gallery.png"}}}
+		urls, err := client.GetFileURLs(context.Background(), []string{"cover", "gallery"})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(urls).To(Equal(map[string]string{"cover": "https://example.com/cover.png", "gallery": "https://example.com/gallery.png"}))
+		Expect(fake.fileURLsReq.GetFileIds()).To(Equal([]string{"cover", "gallery"}))
 	})
 
 	It("maps upstream errors", func() {
@@ -123,6 +157,14 @@ var _ = Describe("file gRPC client", func() {
 		ids, err := client.UploadFiles(context.Background(), "owner-1", "prefix", []domain.MediaUpload{{Filename: "file", ContentType: "image/jpeg", Data: []byte("x")}})
 		Expect(ids).To(BeNil())
 		Expect(err).To(MatchError(domain.ErrInvalidMediaUpload))
+
+		fake.fileURLErr = status.Error(codes.NotFound, "missing")
+		_, err = client.GetFileURL(context.Background(), "file")
+		Expect(err).To(MatchError(domain.ErrInvalidFileID))
+
+		fake.fileURLsErr = status.Error(codes.NotFound, "missing")
+		_, err = client.GetFileURLs(context.Background(), []string{"file"})
+		Expect(err).To(MatchError(domain.ErrInvalidFileID))
 
 		Expect(client.DeleteFile(context.Background(), "file")).To(MatchError(domain.ErrInvalidFileID))
 	})

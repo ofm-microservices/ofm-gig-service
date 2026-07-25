@@ -2,7 +2,7 @@ package nats
 
 import (
 	"gig-service/config"
-	"github.com/ofm-microseervices/ofm-common/pkg/logging"
+	"github.com/ofm-microservices/ofm-common/pkg/logging"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -41,10 +41,34 @@ func EnsureStream(cfg config.NATSConfig, log logging.Logger) error {
 		return ErrNilLogger
 	}
 
+	publishedSubject := cfg.GigPublishedSubject
+	if publishedSubject == "" {
+		publishedSubject = "gig.published"
+	}
+	projectionSubject := cfg.GigProjectionSubject
+	if projectionSubject == "" {
+		projectionSubject = "gig.projection.requested"
+	}
+	previewProjectionSubject := cfg.GigPreviewProjectionSubject
+	if previewProjectionSubject == "" {
+		previewProjectionSubject = "gig.preview.projection.requested"
+	}
+	reviewRatingSubject := cfg.ReviewGigRatingSubject
+	if reviewRatingSubject == "" {
+		reviewRatingSubject = "review.rating.gig"
+	}
+	viewedSubject := cfg.GigViewedSubject
+	if viewedSubject == "" {
+		viewedSubject = "gig.viewed"
+	}
+
 	lg := log.With(logging.String("module", "jetstream-bootstrap"))
 	lg.Info("ensuring jetstream stream",
 		logging.String("stream", cfg.GigEventsStream),
-		logging.String("subject", cfg.GigPublishedSubject),
+		logging.String("published_subject", publishedSubject),
+		logging.String("projection_subject", projectionSubject),
+		logging.String("preview_projection_subject", previewProjectionSubject),
+		logging.String("viewed_subject", viewedSubject),
 	)
 
 	nc, err := connectBootstrap(cfg)
@@ -60,7 +84,7 @@ func EnsureStream(cfg config.NATSConfig, log logging.Logger) error {
 
 	streamCfg := &nats.StreamConfig{
 		Name:      cfg.GigEventsStream,
-		Subjects:  []string{cfg.GigPublishedSubject},
+		Subjects:  []string{publishedSubject, projectionSubject, previewProjectionSubject, viewedSubject},
 		Storage:   nats.FileStorage,
 		Retention: nats.LimitsPolicy,
 		Replicas:  1,

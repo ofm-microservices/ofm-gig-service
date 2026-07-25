@@ -3,12 +3,13 @@ package grpc
 import (
 	"context"
 	"errors"
+	"net"
 	"time"
 
-	"gig-service/internal/domain"
 	"gig-service/config"
-	"github.com/ofm-microseervices/ofm-common/pkg/logging"
-	gigv1 "github.com/ofm-microseervices/ofm-common/proto/gig/v1"
+	"gig-service/internal/domain"
+	"github.com/ofm-microservices/ofm-common/pkg/logging"
+	gigv1 "github.com/ofm-microservices/ofm-common/proto/gig/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/mock/gomock"
@@ -45,9 +46,9 @@ var _ = Describe("gig gRPC mapper", func() {
 			PublishedAt:           &when,
 			CreatedAt:             when,
 			UpdatedAt:             when,
-			Packages: []domain.GigPackage{{ID: "pkg-1", GigID: "gig-1", Tier: domain.TierBasic, Description: "basic", DeliveryDays: 1, PriceCents: 100, SortOrder: 1}},
-			Questions: []domain.GigQuestion{{ID: "q-1", GigID: "gig-1", Content: "question", SortOrder: 1}},
-			Media: []domain.GigMedia{{GigID: "gig-1", FileID: "file-1", SortOrder: 1}},
+			Packages:              []domain.GigPackage{{ID: "pkg-1", GigID: "gig-1", Tier: domain.TierBasic, Description: "basic", DeliveryDays: 1, PriceCents: 100, SortOrder: 1}},
+			Questions:             []domain.GigQuestion{{ID: "q-1", GigID: "gig-1", Content: "question", SortOrder: 1}},
+			Media:                 []domain.GigMedia{{GigID: "gig-1", FileID: "file-1", SortOrder: 1}},
 		})
 
 		Expect(resp.GigId).To(Equal("gig-1"))
@@ -135,6 +136,12 @@ var _ = Describe("gig gRPC server", func() {
 	})
 
 	It("starts and shuts down the grpc server", func() {
+		lis, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			Skip("network listeners are unavailable in this environment")
+		}
+		_ = lis.Close()
+
 		srvAny, err := NewServer(svc, config.GRPCConfig{Host: "127.0.0.1", Port: 0}, logger)
 		Expect(err).NotTo(HaveOccurred())
 		impl := srvAny.(*server)
@@ -144,10 +151,10 @@ var _ = Describe("gig gRPC server", func() {
 			done <- impl.Start()
 		}()
 
-		Eventually(func() bool { return impl.listener != nil }).Should(BeTrue())
+		Eventually(impl.started, 5*time.Second).Should(BeClosed())
 
 		Expect(impl.Shutdown(context.Background())).To(HaveOccurred())
-		Eventually(done).Should(Receive(BeNil()))
+		Eventually(done, 2*time.Second).Should(Receive(BeNil()))
 	})
 
 	It("returns listen errors from Start", func() {
@@ -198,9 +205,13 @@ var _ = Describe("gig gRPC server", func() {
 			svc.EXPECT().GetByID(gomock.Any(), "gig-1", "freelancer-1").Return(&domain.Gig{ID: "gig-1"}, nil)
 			return impl.GetDraft(context.Background(), &gigv1.GetDraftRequest{GigId: "gig-1", FreelancerId: "freelancer-1"})
 		}),
+		Entry("GetGigBySlug", func(impl *server) (any, error) {
+			svc.EXPECT().GetPublicByID(gomock.Any(), "019e706c-616e-7473-9c1a-838c33b75013").Return(&domain.Gig{ID: "019e706c-616e-7473-9c1a-838c33b75013"}, nil)
+			return impl.GetGigBySlug(context.Background(), &gigv1.GetGigBySlugRequest{Slug: "my-gig-019e706c-616e-7473-9c1a-838c33b75013"})
+		}),
 		Entry("Publish", func(impl *server) (any, error) {
-			svc.EXPECT().Publish(gomock.Any(), "gig-1", "freelancer-1").Return(&domain.Gig{ID: "gig-1"}, nil)
-			return impl.Publish(context.Background(), &gigv1.PublishRequest{GigId: "gig-1", FreelancerId: "freelancer-1"})
+			svc.EXPECT().Publish(gomock.Any(), "gig-1", "freelancer-1", "alex").Return(&domain.Gig{ID: "gig-1"}, nil)
+			return impl.Publish(context.Background(), &gigv1.PublishRequest{GigId: "gig-1", FreelancerId: "freelancer-1", Username: "alex"})
 		}),
 	)
 

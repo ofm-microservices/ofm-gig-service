@@ -2,16 +2,50 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
 
+	"gig-service/config"
 	"gig-service/internal/domain"
-	"github.com/ofm-microseervices/ofm-common/pkg/logging"
+	"github.com/ofm-microservices/ofm-common/pkg/logging"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/mock/gomock"
 )
+
+type fakePopularitySource struct{}
+
+func (fakePopularitySource) ListPopularityRows(context.Context) ([]PopularityRow, error) {
+	return nil, nil
+}
+
+type fakeReviewClient struct {
+	calls     []string
+	summaries map[string]*ReviewSummary
+}
+
+func (f *fakeReviewClient) GetGigRatingSummary(_ context.Context, gigID string) (*ReviewSummary, error) {
+	f.calls = append(f.calls, gigID)
+	if f.summaries == nil {
+		return nil, nil
+	}
+	return f.summaries[gigID], nil
+}
+
+func (fakeReviewClient) Close() error { return nil }
+
+type fakeOrderCountClient struct {
+	calls []string
+}
+
+func (f *fakeOrderCountClient) GetOrderCountByGigID(_ context.Context, gigID string) (*OrderCountResult, error) {
+	f.calls = append(f.calls, gigID)
+	return &OrderCountResult{OrderCount: 7}, nil
+}
+
+func (fakeOrderCountClient) Close() error { return nil }
 
 func TestService(t *testing.T) {
 	t.Helper()
@@ -21,28 +55,38 @@ func TestService(t *testing.T) {
 
 var _ = Describe("gigService", func() {
 	var (
-		ctrl    *gomock.Controller
-		repo    *MockGigRepository
-		files   *MockFileService
-		broker  *MockEventBroker
-		slugger *MockSlugger
-		logger  logging.Logger
-		svc     GigService
-		ctx     context.Context
+		ctrl     *gomock.Controller
+		repo     *MockGigRepository
+		readRepo *MockGigReadRepository
+		files    *MockFileService
+		connect  *MockConnectStatusChecker
+		review   *fakeReviewClient
+		orders   *fakeOrderCountClient
+		broker   *MockEventBroker
+		pop      fakePopularitySource
+		slugger  *MockSlugger
+		logger   logging.Logger
+		svc      GigService
+		ctx      context.Context
 	)
 
 	BeforeEach(func() {
 		ctrl = gomock.NewController(GinkgoT())
 		repo = NewMockGigRepository(ctrl)
+		readRepo = NewMockGigReadRepository(ctrl)
 		files = NewMockFileService(ctrl)
+		connect = NewMockConnectStatusChecker(ctrl)
+		review = &fakeReviewClient{}
+		orders = &fakeOrderCountClient{}
 		broker = NewMockEventBroker(ctrl)
+		pop = fakePopularitySource{}
 		slugger = NewMockSlugger(ctrl)
 
 		var err error
 		logger, err = logging.New("gig-service", "test", "debug")
 		Expect(err).NotTo(HaveOccurred())
 
-		svc, err = New(repo, files, broker, slugger, logger)
+		svc, err = New(repo, readRepo, files, connect, review, orders, broker, pop, slugger, logger, config.PreviewPaginationConfig{PageSize: 1, WindowSize: 2})
 		Expect(err).NotTo(HaveOccurred())
 		ctx = context.Background()
 	})
@@ -53,23 +97,43 @@ var _ = Describe("gigService", func() {
 
 	Describe("New", func() {
 		It("validates nil dependencies", func() {
-			created, err := New(nil, files, broker, slugger, logger)
+			created, err := New(nil, readRepo, files, connect, review, orders, broker, pop, slugger, logger, config.PreviewPaginationConfig{PageSize: 1, WindowSize: 2})
 			Expect(created).To(BeNil())
 			Expect(err).To(MatchError(ErrNilGigRepository))
 
-			created, err = New(repo, nil, broker, slugger, logger)
+			created, err = New(repo, nil, files, connect, review, orders, broker, pop, slugger, logger, config.PreviewPaginationConfig{PageSize: 1, WindowSize: 2})
+			Expect(created).To(BeNil())
+			Expect(err).To(MatchError(ErrNilGigReadRepository))
+
+			created, err = New(repo, readRepo, nil, connect, review, orders, broker, pop, slugger, logger, config.PreviewPaginationConfig{PageSize: 1, WindowSize: 2})
 			Expect(created).To(BeNil())
 			Expect(err).To(MatchError(ErrNilFileService))
 
-			created, err = New(repo, files, nil, slugger, logger)
+			created, err = New(repo, readRepo, files, nil, review, orders, broker, pop, slugger, logger, config.PreviewPaginationConfig{PageSize: 1, WindowSize: 2})
+			Expect(created).To(BeNil())
+			Expect(err).To(MatchError(ErrNilConnectStatusChecker))
+
+			created, err = New(repo, readRepo, files, connect, nil, orders, broker, pop, slugger, logger, config.PreviewPaginationConfig{PageSize: 1, WindowSize: 2})
+			Expect(created).To(BeNil())
+			Expect(err).To(MatchError(ErrNilReviewClient))
+
+			created, err = New(repo, readRepo, files, connect, review, nil, broker, pop, slugger, logger, config.PreviewPaginationConfig{PageSize: 1, WindowSize: 2})
+			Expect(created).To(BeNil())
+			Expect(err).To(MatchError(ErrNilOrderCountClient))
+
+			created, err = New(repo, readRepo, files, connect, review, orders, nil, pop, slugger, logger, config.PreviewPaginationConfig{PageSize: 1, WindowSize: 2})
 			Expect(created).To(BeNil())
 			Expect(err).To(MatchError(ErrNilEventBroker))
 
-			created, err = New(repo, files, broker, nil, logger)
+			created, err = New(repo, readRepo, files, connect, review, orders, broker, nil, slugger, logger, config.PreviewPaginationConfig{PageSize: 1, WindowSize: 2})
+			Expect(created).To(BeNil())
+			Expect(err).To(MatchError(ErrNilPopularitySource))
+
+			created, err = New(repo, readRepo, files, connect, review, orders, broker, pop, nil, logger, config.PreviewPaginationConfig{PageSize: 1, WindowSize: 2})
 			Expect(created).To(BeNil())
 			Expect(err).To(MatchError(ErrNilSlugger))
 
-			created, err = New(repo, files, broker, slugger, nil)
+			created, err = New(repo, readRepo, files, connect, review, orders, broker, pop, slugger, nil, config.PreviewPaginationConfig{PageSize: 1, WindowSize: 2})
 			Expect(created).To(BeNil())
 			Expect(err).To(MatchError(ErrNilLogger))
 		})
@@ -86,6 +150,7 @@ var _ = Describe("gigService", func() {
 			repo.EXPECT().
 				CreateDraft(gomock.Any(), domain.CreateDraftParams{FreelancerID: "freelancer-1"}).
 				Return(&domain.Gig{ID: "gig-1", FreelancerID: "freelancer-1"}, nil)
+			broker.EXPECT().Publish(gomock.Any(), gigPreviewProjectionSubject, gomock.AssignableToTypeOf([]byte{})).Return(nil)
 
 			result, err := svc.CreateDraft(ctx, " freelancer-1 ")
 			Expect(err).NotTo(HaveOccurred())
@@ -100,6 +165,33 @@ var _ = Describe("gigService", func() {
 			result, err := svc.CreateDraft(ctx, "freelancer-1")
 			Expect(result).To(BeNil())
 			Expect(err).To(MatchError("boom"))
+		})
+	})
+
+	Describe("GetMyGigs", func() {
+		It("reads cached owner previews without calling review-service", func() {
+			readRepo.EXPECT().
+				ListOwnerPreviewGigs(gomock.Any(), "user-1").
+				Return([]*domain.GigPreview{{
+					ID:           "gig-1",
+					FreelancerID: "user-1",
+					Status:       domain.StatusPublished,
+					RatingAvg:    4.5,
+					TotalReviews: 12,
+					UpdatedAt:    time.Unix(10, 0).UTC(),
+				}}, nil)
+
+			result, err := svc.GetMyGigs(ctx, domain.ListMyGigsQuery{
+				UserID: "user-1",
+				Status: domain.StatusPublished,
+				Sort:   gigListSortUpdatedAt,
+				Order:  gigListOrderDesc,
+				Page:   1,
+				Limit:  1,
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).NotTo(BeNil())
+			Expect(review.calls).To(BeEmpty())
 		})
 	})
 
@@ -120,18 +212,19 @@ var _ = Describe("gigService", func() {
 				Expect(result).To(BeNil())
 				Expect(err).To(MatchError(expected))
 			},
-			Entry("blank title", domain.UpdateBasicInfoParams{Title: "   ", Description: "desc", CategoryID: 1, Currency: "usd"}, domain.ErrInvalidTitle),
-			Entry("blank description", domain.UpdateBasicInfoParams{Title: "title", Description: "", CategoryID: 1, Currency: "usd"}, domain.ErrInvalidDescription),
-			Entry("invalid category", domain.UpdateBasicInfoParams{Title: "title", Description: "desc", CategoryID: 0, Currency: "usd"}, domain.ErrInvalidCategoryID),
-			Entry("blank currency", domain.UpdateBasicInfoParams{Title: "title", Description: "desc", CategoryID: 1, Currency: "   "}, domain.ErrInvalidCurrency),
+			Entry("blank title", domain.UpdateBasicInfoParams{Title: "   ", ShortInfo: "short", Description: "desc", CategoryID: 1, Currency: "usd"}, domain.ErrInvalidTitle),
+			Entry("blank description", domain.UpdateBasicInfoParams{Title: "title", ShortInfo: "short", Description: "", CategoryID: 1, Currency: "usd"}, domain.ErrInvalidDescription),
+			Entry("invalid category", domain.UpdateBasicInfoParams{Title: "title", ShortInfo: "short", Description: "desc", CategoryID: 0, Currency: "usd"}, domain.ErrInvalidCategoryID),
+			Entry("blank currency", domain.UpdateBasicInfoParams{Title: "title", ShortInfo: "short", Description: "desc", CategoryID: 1, Currency: "   "}, domain.ErrInvalidCurrency),
 		)
 
 		It("rejects an empty slug returned by the slugger", func() {
 			repo.EXPECT().GetByID(gomock.Any(), "gig-1").Return(&domain.Gig{ID: "gig-1", FreelancerID: "freelancer-1"}, nil)
-			slugger.EXPECT().Generate("Title").Return("")
+			slugger.EXPECT().Generate("Title", "gig-1").Return("")
 
 			result, err := svc.UpdateBasicInfo(ctx, "gig-1", "freelancer-1", domain.UpdateBasicInfoParams{
 				Title:       " Title ",
+				ShortInfo:   " short ",
 				Description: "desc",
 				CategoryID:  1,
 				Currency:    "usd",
@@ -142,19 +235,23 @@ var _ = Describe("gigService", func() {
 
 		It("updates the repository with normalized values", func() {
 			repo.EXPECT().GetByID(gomock.Any(), "gig-1").Return(&domain.Gig{ID: "gig-1", FreelancerID: "freelancer-1"}, nil)
-			slugger.EXPECT().Generate("My Title").Return("my-title")
+			slugger.EXPECT().Generate("My Title", "gig-1").Return("my-title-gig-1")
 			repo.EXPECT().
 				UpdateBasicInfo(gomock.Any(), "gig-1", domain.UpdateBasicInfoParams{
 					Title:       "My Title",
-					Slug:        "my-title",
+					ShortInfo:   "short",
+					Slug:        "my-title-gig-1",
 					Description: "desc",
 					CategoryID:  1001,
 					Currency:    "usd",
 				}).
 				Return(&domain.Gig{ID: "gig-1"}, nil)
+			broker.EXPECT().Publish(gomock.Any(), gigProjectionRequestedSubject, gomock.AssignableToTypeOf([]byte{})).Return(nil)
+			broker.EXPECT().Publish(gomock.Any(), gigPreviewProjectionSubject, gomock.AssignableToTypeOf([]byte{})).Return(nil)
 
 			result, err := svc.UpdateBasicInfo(ctx, "gig-1", "freelancer-1", domain.UpdateBasicInfoParams{
 				Title:       " My Title ",
+				ShortInfo:   " short ",
 				Description: " desc ",
 				CategoryID:  1001,
 				Currency:    " usd ",
@@ -165,13 +262,14 @@ var _ = Describe("gigService", func() {
 
 		It("returns repository failures", func() {
 			repo.EXPECT().GetByID(gomock.Any(), "gig-1").Return(&domain.Gig{ID: "gig-1", FreelancerID: "freelancer-1"}, nil)
-			slugger.EXPECT().Generate("Title").Return("title")
+			slugger.EXPECT().Generate("Title", "gig-1").Return("title-gig-1")
 			repo.EXPECT().
 				UpdateBasicInfo(gomock.Any(), gomock.Any(), gomock.Any()).
 				Return(nil, errors.New("update failed"))
 
 			result, err := svc.UpdateBasicInfo(ctx, "gig-1", "freelancer-1", domain.UpdateBasicInfoParams{
 				Title:       "Title",
+				ShortInfo:   "short",
 				Description: "desc",
 				CategoryID:  1,
 				Currency:    "usd",
@@ -217,6 +315,8 @@ var _ = Describe("gigService", func() {
 					},
 				}).
 				Return(&domain.Gig{ID: "gig-1"}, nil)
+			broker.EXPECT().Publish(gomock.Any(), gigProjectionRequestedSubject, gomock.AssignableToTypeOf([]byte{})).Return(nil)
+			broker.EXPECT().Publish(gomock.Any(), gigPreviewProjectionSubject, gomock.AssignableToTypeOf([]byte{})).Return(nil)
 
 			result, err := svc.ReplacePackages(ctx, "gig-1", "freelancer-1", domain.ReplacePackagesParams{
 				Packages: []domain.GigPackage{
@@ -248,6 +348,8 @@ var _ = Describe("gigService", func() {
 					Questions: []domain.GigQuestion{{Content: "question one"}, {Content: "question two"}},
 				}).
 				Return(&domain.Gig{ID: "gig-1"}, nil)
+			broker.EXPECT().Publish(gomock.Any(), gigProjectionRequestedSubject, gomock.AssignableToTypeOf([]byte{})).Return(nil)
+			broker.EXPECT().Publish(gomock.Any(), gigPreviewProjectionSubject, gomock.AssignableToTypeOf([]byte{})).Return(nil)
 
 			result, err := svc.ReplaceQuestions(ctx, "gig-1", "freelancer-1", domain.ReplaceQuestionsParams{
 				Questions: []domain.GigQuestion{{Content: "question one"}, {Content: "question two"}},
@@ -305,6 +407,8 @@ var _ = Describe("gigService", func() {
 					Media:         []domain.GigMedia{{GigID: "gig-1", FileID: "gallery-file", SortOrder: 1}},
 				}).
 				Return(&domain.Gig{ID: "gig-1"}, nil)
+			broker.EXPECT().Publish(gomock.Any(), gigProjectionRequestedSubject, gomock.AssignableToTypeOf([]byte{})).Return(nil)
+			broker.EXPECT().Publish(gomock.Any(), gigPreviewProjectionSubject, gomock.AssignableToTypeOf([]byte{})).Return(nil)
 
 			result, err := svc.ReplaceMedia(ctx, "gig-1", "freelancer-1", domain.ReplaceMediaUploadParams{
 				Files: []domain.MediaUpload{
@@ -314,6 +418,66 @@ var _ = Describe("gigService", func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result.ID).To(Equal("gig-1"))
+		})
+	})
+
+	Describe("AppendPreviewGig", func() {
+		It("rebuilds the preview windows from source when window zero is missing", func() {
+			gig := &domain.Gig{
+				ID:             "gig-1",
+				FreelancerID:   "user-1",
+				SellerUsername: "alex1",
+				Slug:           "gig-1",
+				Title:          "First gig",
+				ShortInfo:      "short",
+				Status:         domain.StatusPublished,
+				CreatedAt:      time.Unix(0, 0).UTC(),
+			}
+
+			readRepo.EXPECT().
+				ListPreviewWindow(gomock.Any(), "user-1", 0).
+				Return(nil, domain.ErrGigNotFound)
+			readRepo.EXPECT().
+				GetUserLookup(gomock.Any(), "alex1").
+				Return("user-1", nil)
+			readRepo.EXPECT().
+				ListPreviewWindow(gomock.Any(), "user-1", 0).
+				Return(nil, domain.ErrGigNotFound)
+			repo.EXPECT().
+				ListPublishedBySellerUsername(gomock.Any(), domain.ListPreviewGigsQuery{SellerUsername: "alex1", Limit: 0}).
+				Return([]*domain.Gig{gig}, nil)
+			readRepo.EXPECT().
+				SetPopularitySnapshot(gomock.Any(), gomock.Any()).
+				Return(nil)
+			readRepo.EXPECT().
+				GetPopularitySnapshot(gomock.Any(), "gig-1").
+				Return((*domain.GigPopularitySnapshot)(nil), domain.ErrGigNotFound)
+			readRepo.EXPECT().
+				GetPopularitySnapshot(gomock.Any(), "gig-1").
+				Return((*domain.GigPopularitySnapshot)(nil), domain.ErrGigNotFound)
+			readRepo.EXPECT().
+				GetPreviewByID(gomock.Any(), "gig-1").
+				Return((*domain.GigPreview)(nil), domain.ErrGigNotFound).
+				AnyTimes()
+			readRepo.EXPECT().
+				GetPreviewByID(gomock.Any(), "gig-1").
+				Return((*domain.GigPreview)(nil), domain.ErrGigNotFound).
+				AnyTimes()
+			readRepo.EXPECT().
+				UpsertOwnerPreview(gomock.Any(), "user-1", gomock.Any()).
+				Return(nil).
+				AnyTimes()
+			readRepo.EXPECT().
+				ListPopularitySnapshotsByGigIDs(gomock.Any(), []string{"gig-1"}).
+				Return(map[string]*domain.GigPopularitySnapshot{}, nil)
+			readRepo.EXPECT().
+				UpsertPreviewWindow(gomock.Any(), "user-1", 0, gomock.Any(), false, time.Duration(0)).
+				Return(nil)
+			readRepo.EXPECT().
+				AppendPreviewGig(gomock.Any(), "user-1", gomock.Any(), 2, time.Duration(0)).
+				Return(nil)
+
+			Expect(svc.AppendPreviewGig(ctx, gig)).To(Succeed())
 		})
 	})
 
@@ -331,7 +495,7 @@ var _ = Describe("gigService", func() {
 		It("rejects incomplete drafts", func() {
 			repo.EXPECT().GetByID(gomock.Any(), "gig-1").Return(&domain.Gig{ID: "gig-1", FreelancerID: "freelancer-1", Status: domain.StatusDraft}, nil)
 
-			result, err := svc.Publish(ctx, "gig-1", "freelancer-1")
+			result, err := svc.Publish(ctx, "gig-1", "freelancer-1", "alex")
 			Expect(result).To(BeNil())
 			Expect(err).To(MatchError(domain.ErrGigDraftIncomplete))
 		})
@@ -339,9 +503,30 @@ var _ = Describe("gigService", func() {
 		It("rejects already published gigs", func() {
 			repo.EXPECT().GetByID(gomock.Any(), "gig-1").Return(&domain.Gig{ID: "gig-1", FreelancerID: "freelancer-1", Status: domain.StatusPublished, BasicInfoCompleted: true, PackagesCompleted: true, Packages: []domain.GigPackage{{Tier: domain.TierBasic, Description: "basic", DeliveryDays: 1, PriceCents: 1}}}, nil)
 
-			result, err := svc.Publish(ctx, "gig-1", "freelancer-1")
+			result, err := svc.Publish(ctx, "gig-1", "freelancer-1", "alex")
 			Expect(result).To(BeNil())
 			Expect(err).To(MatchError(domain.ErrGigAlreadyPublished))
+		})
+
+		It("rejects publish when connect onboarding is incomplete", func() {
+			connect.EXPECT().GetConnectStatus(gomock.Any(), "freelancer-1").
+				Return(&ConnectStatusResult{UserID: "freelancer-1", Status: "pending"}, nil)
+			repo.EXPECT().GetByID(gomock.Any(), "gig-1").Return(&domain.Gig{
+				ID:                    "gig-1",
+				FreelancerID:          "freelancer-1",
+				Status:                domain.StatusDraft,
+				BasicInfoCompleted:    true,
+				PackagesCompleted:     true,
+				RequirementsCompleted: true,
+				MediaCompleted:        true,
+				Packages: []domain.GigPackage{
+					{Tier: domain.TierBasic, Description: "basic", DeliveryDays: 1, PriceCents: 1},
+				},
+			}, nil)
+
+			result, err := svc.Publish(ctx, "gig-1", "freelancer-1", "alex")
+			Expect(result).To(BeNil())
+			Expect(err).To(MatchError(domain.ErrConnectOnboardingIncomplete))
 		})
 
 		It("publishes the gig and emits the event", func() {
@@ -371,7 +556,28 @@ var _ = Describe("gigService", func() {
 			}
 
 			repo.EXPECT().GetByID(gomock.Any(), "gig-1").Return(gig, nil)
+			connect.EXPECT().GetConnectStatus(gomock.Any(), "freelancer-1").
+				Return(&ConnectStatusResult{UserID: "freelancer-1", Status: "completed"}, nil)
 			repo.EXPECT().Publish(gomock.Any(), "gig-1").Return(gig, nil)
+			repo.EXPECT().UpdateSellerUsername(gomock.Any(), "gig-1", "alex").Return(&domain.Gig{
+				ID:                    "gig-1",
+				FreelancerID:          "freelancer-1",
+				SellerUsername:        "alex",
+				Slug:                  "gig-1",
+				Title:                 "Gig One",
+				Description:           "desc",
+				CategoryID:            1001,
+				Currency:              "usd",
+				Status:                domain.StatusDraft,
+				BasicInfoCompleted:    true,
+				PackagesCompleted:     true,
+				RequirementsCompleted: true,
+				MediaCompleted:        true,
+				PictureFileID:         "cover-file",
+				Packages:              gig.Packages,
+				Questions:             gig.Questions,
+				Media:                 gig.Media,
+			}, nil)
 			broker.EXPECT().Publish(gomock.Any(), gigPublishedSubject, gomock.AssignableToTypeOf([]byte{})).
 				DoAndReturn(func(_ context.Context, subject string, payload []byte) error {
 					Expect(subject).To(Equal(gigPublishedSubject))
@@ -381,8 +587,10 @@ var _ = Describe("gigService", func() {
 					Expect(parsed.Media[0].FileID).To(Equal("gallery-file"))
 					return nil
 				})
+			broker.EXPECT().Publish(gomock.Any(), gigProjectionRequestedSubject, gomock.AssignableToTypeOf([]byte{})).Return(nil)
+			broker.EXPECT().Publish(gomock.Any(), gigPreviewProjectionSubject, gomock.AssignableToTypeOf([]byte{})).Return(nil)
 
-			result, err := svc.Publish(ctx, "gig-1", "freelancer-1")
+			result, err := svc.Publish(ctx, "gig-1", "freelancer-1", "alex")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result.Status).To(Equal(domain.StatusDraft))
 		})
@@ -407,12 +615,110 @@ var _ = Describe("gigService", func() {
 			}
 
 			repo.EXPECT().GetByID(gomock.Any(), "gig-1").Return(gig, nil)
+			connect.EXPECT().GetConnectStatus(gomock.Any(), "freelancer-1").
+				Return(&ConnectStatusResult{UserID: "freelancer-1", Status: "completed"}, nil)
 			repo.EXPECT().Publish(gomock.Any(), "gig-1").Return(gig, nil)
+			repo.EXPECT().UpdateSellerUsername(gomock.Any(), "gig-1", "alex").Return(gig, nil)
 			broker.EXPECT().Publish(gomock.Any(), gigPublishedSubject, gomock.Any()).Return(errors.New("broker failed"))
 
-			result, err := svc.Publish(ctx, "gig-1", "freelancer-1")
+			result, err := svc.Publish(ctx, "gig-1", "freelancer-1", "alex")
 			Expect(result).To(BeNil())
 			Expect(err).To(MatchError("broker failed"))
+		})
+	})
+
+	Describe("Project", func() {
+		It("loads all public urls in a single batch", func() {
+			gig := &domain.Gig{
+				ID:                    "gig-1",
+				PictureFileID:         "cover-file",
+				Media:                 []domain.GigMedia{{GigID: "gig-1", FileID: "gallery-1", SortOrder: 1}, {GigID: "gig-1", FileID: "cover-file", SortOrder: 2}},
+				PictureURL:            "",
+				MediaCompleted:        true,
+				RequirementsCompleted: true,
+				PackagesCompleted:     true,
+				BasicInfoCompleted:    true,
+			}
+
+			files.EXPECT().
+				GetFileURLs(gomock.Any(), []string{"cover-file", "gallery-1"}).
+				Return(map[string]string{
+					"cover-file": "https://public.local/cover-file",
+					"gallery-1":  "https://public.local/gallery-1",
+				}, nil)
+
+			projected, err := svc.Project(ctx, gig)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(projected.PictureURL).To(Equal("https://public.local/cover-file"))
+			Expect(projected.Media).To(HaveLen(2))
+			Expect(projected.Media[0].URL).To(Equal("https://public.local/gallery-1"))
+			Expect(projected.Media[1].URL).To(Equal("https://public.local/cover-file"))
+		})
+
+		It("ignores file-service failures when projecting public urls", func() {
+			gig := &domain.Gig{
+				ID:            "gig-1",
+				PictureFileID: "cover-file",
+				Media:         []domain.GigMedia{{GigID: "gig-1", FileID: "gallery-1", SortOrder: 1}},
+			}
+
+			files.EXPECT().
+				GetFileURLs(gomock.Any(), []string{"cover-file", "gallery-1"}).
+				Return(nil, errors.New("file-service down"))
+
+			projected, err := svc.Project(ctx, gig)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(projected.PictureURL).To(BeEmpty())
+			Expect(projected.Media).To(HaveLen(1))
+			Expect(projected.Media[0].URL).To(BeEmpty())
+		})
+	})
+
+	Describe("GetPublicByID", func() {
+		It("returns cached gigs and emits a gig.viewed event", func() {
+			gig := &domain.Gig{
+				ID:             "gig-1",
+				FreelancerID:   "freelancer-1",
+				SellerUsername: "alex1",
+				Slug:           "gig-1",
+			}
+
+			readRepo.EXPECT().GetByID(gomock.Any(), "gig-1").Return(gig, nil)
+			broker.EXPECT().Publish(gomock.Any(), gigViewedSubject, gomock.AssignableToTypeOf([]byte{})).
+				DoAndReturn(func(_ context.Context, subject string, payload []byte) error {
+					Expect(subject).To(Equal(gigViewedSubject))
+					var event GigViewedEvent
+					Expect(json.Unmarshal(payload, &event)).To(Succeed())
+					Expect(event.GigID).To(Equal("gig-1"))
+					Expect(event.FreelancerID).To(Equal("freelancer-1"))
+					Expect(event.SellerUsername).To(Equal("alex1"))
+					Expect(event.Slug).To(Equal("gig-1"))
+					Expect(event.ViewedAt).NotTo(BeZero())
+					return nil
+				})
+
+			result, err := svc.GetPublicByID(ctx, "gig-1")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(gig))
+		})
+
+		It("loads from the write repository, projects, caches, and emits a gig.viewed event", func() {
+			gig := &domain.Gig{
+				ID:             "gig-1",
+				FreelancerID:   "freelancer-1",
+				SellerUsername: "alex1",
+				Slug:           "gig-1",
+				Status:         domain.StatusPublished,
+			}
+
+			readRepo.EXPECT().GetByID(gomock.Any(), "gig-1").Return(nil, domain.ErrGigNotFound)
+			repo.EXPECT().GetByID(gomock.Any(), "gig-1").Return(gig, nil)
+			readRepo.EXPECT().Upsert(gomock.Any(), gomock.Any()).Return(nil)
+			broker.EXPECT().Publish(gomock.Any(), gigViewedSubject, gomock.Any()).Return(nil)
+
+			result, err := svc.GetPublicByID(ctx, "gig-1")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.ID).To(Equal("gig-1"))
 		})
 	})
 
@@ -448,7 +754,7 @@ var _ = Describe("gigService", func() {
 
 	Describe("slugger", func() {
 		It("generates slugs using the production implementation", func() {
-			Expect(NewSlugger().Generate(" Gig Title 123 ")).To(Equal("gig-title-123"))
+			Expect(NewSlugger().Generate(" Gig Title 123 ", "gig-1")).To(Equal("gig-title-123-gig-1"))
 		})
 	})
 
@@ -489,6 +795,21 @@ var _ = Describe("gigService", func() {
 			parsed, err := NewGigEventMapper().FromPublishedPayload(payload)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(parsed).To(Equal(gig))
+		})
+
+		It("builds viewed payloads", func() {
+			gig := &domain.Gig{ID: "gig-1", FreelancerID: "freelancer-1", SellerUsername: "alex1", Slug: "gig-1"}
+
+			payload, err := NewGigEventMapper().ToViewedPayload(gig)
+			Expect(err).NotTo(HaveOccurred())
+
+			var event GigViewedEvent
+			Expect(json.Unmarshal(payload, &event)).To(Succeed())
+			Expect(event.GigID).To(Equal("gig-1"))
+			Expect(event.FreelancerID).To(Equal("freelancer-1"))
+			Expect(event.SellerUsername).To(Equal("alex1"))
+			Expect(event.Slug).To(Equal("gig-1"))
+			Expect(event.ViewedAt).NotTo(BeZero())
 		})
 
 		It("returns JSON decoding failures", func() {
