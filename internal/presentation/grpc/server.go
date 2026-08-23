@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"gig-service/config"
 	"gig-service/internal/domain"
@@ -44,11 +45,11 @@ func NewServer(svc GigService, cfg config.GRPCConfig, log logging.Logger) (Serve
 		grpc.UnaryInterceptor(metrics.UnaryServerInterceptor()),
 	)
 	s := &server{
-		svc:  svc,
-		cfg:  cfg,
-		mapr: newGigMapper(log.With(logging.String("module", "grpc-mapper"))),
-		log:  log.With(logging.String("module", "grpc-server")),
-		srv:  grpcSrv,
+		svc:     svc,
+		cfg:     cfg,
+		mapr:    newGigMapper(log.With(logging.String("module", "grpc-mapper"))),
+		log:     log.With(logging.String("module", "grpc-server")),
+		srv:     grpcSrv,
 		started: make(chan struct{}),
 	}
 	gigv1.RegisterGigCommandServiceServer(grpcSrv, s)
@@ -90,7 +91,7 @@ func (s *server) CreateDraft(ctx context.Context, req *gigv1.CreateDraftRequest)
 	log := logging.WithContext(ctx, s.log)
 	gig, err := s.svc.CreateDraft(ctx, req.GetFreelancerId())
 	if err != nil {
-		log.Error("create draft failed",
+		log.Warn("create draft returned a business/storage condition",
 			logging.Operation("grpc.gig.create_draft"),
 			logging.Attempt(1),
 			logging.Retryable(false),
@@ -110,7 +111,7 @@ func (s *server) UpdateBasicInfo(ctx context.Context, req *gigv1.UpdateBasicInfo
 	log := logging.WithContext(ctx, s.log)
 	gig, err := s.svc.UpdateBasicInfo(ctx, req.GetGigId(), req.GetFreelancerId(), s.mapr.ToUpdateBasicInfoParams(req))
 	if err != nil {
-		log.Error("update basic info failed",
+		log.Warn("update basic info returned a business/storage condition",
 			logging.Operation("grpc.gig.update_basic_info"),
 			logging.Attempt(1),
 			logging.Retryable(false),
@@ -131,7 +132,7 @@ func (s *server) ReplacePackages(ctx context.Context, req *gigv1.ReplacePackages
 	log := logging.WithContext(ctx, s.log)
 	gig, err := s.svc.ReplacePackages(ctx, req.GetGigId(), req.GetFreelancerId(), s.mapr.ToReplacePackagesParams(req))
 	if err != nil {
-		log.Error("replace packages failed",
+		log.Warn("replace packages returned a business/storage condition",
 			logging.Operation("grpc.gig.replace_packages"),
 			logging.Attempt(1),
 			logging.Retryable(false),
@@ -152,7 +153,7 @@ func (s *server) ReplaceQuestions(ctx context.Context, req *gigv1.ReplaceQuestio
 	log := logging.WithContext(ctx, s.log)
 	gig, err := s.svc.ReplaceQuestions(ctx, req.GetGigId(), req.GetFreelancerId(), s.mapr.ToReplaceQuestionsParams(req))
 	if err != nil {
-		log.Error("replace questions failed",
+		log.Warn("replace questions returned a business/storage condition",
 			logging.Operation("grpc.gig.replace_questions"),
 			logging.Attempt(1),
 			logging.Retryable(false),
@@ -173,7 +174,7 @@ func (s *server) ReplaceMedia(ctx context.Context, req *gigv1.ReplaceMediaReques
 	log := logging.WithContext(ctx, s.log)
 	gig, err := s.svc.ReplaceMedia(ctx, req.GetGigId(), req.GetFreelancerId(), s.mapr.ToReplaceMediaParams(req))
 	if err != nil {
-		log.Error("replace media failed",
+		log.Warn("replace media returned a business/storage condition",
 			logging.Operation("grpc.gig.replace_media"),
 			logging.Attempt(1),
 			logging.Retryable(false),
@@ -194,7 +195,7 @@ func (s *server) GetDraft(ctx context.Context, req *gigv1.GetDraftRequest) (*gig
 	log := logging.WithContext(ctx, s.log)
 	gig, err := s.svc.GetByID(ctx, req.GetGigId(), req.GetFreelancerId())
 	if err != nil {
-		log.Error("get draft failed",
+		log.Warn("get draft returned a business/storage condition",
 			logging.Operation("grpc.gig.get_draft"),
 			logging.Attempt(1),
 			logging.Retryable(false),
@@ -215,7 +216,7 @@ func (s *server) GetOrderStartSnapshot(ctx context.Context, req *gigv1.GetOrderS
 	log := logging.WithContext(ctx, s.log)
 	snapshot, err := s.svc.GetOrderStartSnapshot(ctx, req.GetGigId(), req.GetPackageId())
 	if err != nil {
-		log.Error("get order start snapshot failed",
+		log.Warn("get order start snapshot returned a business/storage condition",
 			logging.Operation("grpc.gig.get_order_start_snapshot"),
 			logging.Attempt(1),
 			logging.Retryable(false),
@@ -236,7 +237,7 @@ func (s *server) GetGigBySlug(ctx context.Context, req *gigv1.GetGigBySlugReques
 	log := logging.WithContext(ctx, s.log)
 	gigID, err := parseGigIDFromSlug(req.GetSlug())
 	if err != nil {
-		log.Error("get gig by slug failed",
+		log.Warn("get gig by slug returned a business/storage condition",
 			logging.Operation("grpc.gig.get_by_slug"),
 			logging.Attempt(1),
 			logging.Retryable(false),
@@ -249,15 +250,24 @@ func (s *server) GetGigBySlug(ctx context.Context, req *gigv1.GetGigBySlugReques
 
 	gig, err := s.svc.GetPublicByID(ctx, gigID)
 	if err != nil {
-		log.Error("get gig by slug failed",
-			logging.Operation("grpc.gig.get_by_slug"),
-			logging.Attempt(1),
-			logging.Retryable(false),
-			logging.DurationMS(time.Since(started)),
-			logging.String("slug", req.GetSlug()),
-			logging.String("gig_id", gigID),
-			logging.Err(err),
-		)
+		if errors.Is(err, domain.ErrGigNotFound) {
+			log.Warn("gig not found",
+				logging.Operation("grpc.gig.get_by_slug"),
+				logging.String("slug", req.GetSlug()),
+				logging.String("gig_id", gigID),
+				logging.Err(err),
+			)
+		} else {
+			log.Error("get gig by slug failed",
+				logging.Operation("grpc.gig.get_by_slug"),
+				logging.Attempt(1),
+				logging.Retryable(false),
+				logging.DurationMS(time.Since(started)),
+				logging.String("slug", req.GetSlug()),
+				logging.String("gig_id", gigID),
+				logging.Err(err),
+			)
+		}
 		return nil, s.mapr.ToError(err)
 	}
 
@@ -274,7 +284,7 @@ func (s *server) GetPreviewGigsByFreelancerUsername(ctx context.Context, req *gi
 		Limit:          int(req.GetLimit()),
 	})
 	if err != nil {
-		log.Error("get preview gigs by freelancer username failed",
+		log.Warn("get preview gigs by freelancer username returned a business/storage condition",
 			logging.Operation("grpc.gig.get_preview_by_username"),
 			logging.Attempt(1),
 			logging.Retryable(false),
@@ -301,7 +311,7 @@ func (s *server) GetMyGigs(ctx context.Context, req *gigv1.GetMyGigsRequest) (*g
 		Limit:  int(req.GetLimit()),
 	})
 	if err != nil {
-		log.Error("get my gigs failed",
+		log.Warn("get my gigs returned a business/storage condition",
 			logging.Operation("grpc.gig.get_my_gigs"),
 			logging.Attempt(1),
 			logging.Retryable(false),
@@ -321,7 +331,7 @@ func (s *server) Publish(ctx context.Context, req *gigv1.PublishRequest) (*gigv1
 	log := logging.WithContext(ctx, s.log)
 	gig, err := s.svc.Publish(ctx, req.GetGigId(), req.GetFreelancerId(), req.GetUsername())
 	if err != nil {
-		log.Error("publish failed",
+		log.Warn("publish returned a business/storage condition",
 			logging.Operation("grpc.gig.publish"),
 			logging.Attempt(1),
 			logging.Retryable(false),

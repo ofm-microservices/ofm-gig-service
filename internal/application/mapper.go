@@ -120,20 +120,25 @@ func (m *gigEventMapper) ToViewedPayload(gig *domain.Gig) ([]byte, error) {
 
 func (m *gigEventMapper) ToReadModelPayload(gig *domain.Gig) ([]byte, error) {
 	payload := GigReadModelEvent{
-		GigID:          gig.ID,
-		FreelancerID:   gig.FreelancerID,
-		SellerUsername: gig.SellerUsername,
-		Slug:           gig.Slug,
-		Title:          gig.Title,
-		ShortInfo:      gig.ShortInfo,
-		Description:    gig.Description,
-		CategoryID:     gig.CategoryID,
-		Currency:       gig.Currency,
-		PictureFileID:  gig.PictureFileID,
-		PictureURL:     gig.PictureURL,
-		PublishedAt:    gig.PublishedAt,
-		CreatedAt:      gig.CreatedAt,
-		UpdatedAt:      gig.UpdatedAt,
+		GigID:                 gig.ID,
+		FreelancerID:          gig.FreelancerID,
+		SellerUsername:        gig.SellerUsername,
+		Slug:                  gig.Slug,
+		Title:                 gig.Title,
+		ShortInfo:             gig.ShortInfo,
+		Description:           gig.Description,
+		CategoryID:            gig.CategoryID,
+		Currency:              gig.Currency,
+		Status:                gig.Status,
+		BasicInfoCompleted:    gig.BasicInfoCompleted,
+		PackagesCompleted:     gig.PackagesCompleted,
+		RequirementsCompleted: gig.RequirementsCompleted,
+		MediaCompleted:        gig.MediaCompleted,
+		PictureFileID:         gig.PictureFileID,
+		PictureURL:            gig.PictureURL,
+		PublishedAt:           gig.PublishedAt,
+		CreatedAt:             gig.CreatedAt,
+		UpdatedAt:             gig.UpdatedAt,
 	}
 
 	if len(gig.Packages) > 0 {
@@ -160,6 +165,12 @@ func (m *gigEventMapper) ToReadModelPayload(gig *domain.Gig) ([]byte, error) {
 				URL:       item.URL,
 				SortOrder: item.SortOrder,
 			})
+		}
+	}
+	if len(gig.Questions) > 0 {
+		payload.Questions = make([]GigReadModelQuestion, 0, len(gig.Questions))
+		for _, question := range gig.Questions {
+			payload.Questions = append(payload.Questions, GigReadModelQuestion{ID: question.ID, GigID: question.GigID, Content: question.Content, SortOrder: question.SortOrder})
 		}
 	}
 
@@ -243,22 +254,30 @@ func (m *gigEventMapper) FromReadModelPayload(payload []byte) (*domain.Gig, erro
 	}
 
 	gig := &domain.Gig{
-		ID:             event.GigID,
-		FreelancerID:   event.FreelancerID,
-		SellerUsername: event.SellerUsername,
-		Slug:           event.Slug,
-		Title:          event.Title,
-		ShortInfo:      event.ShortInfo,
-		Description:    event.Description,
-		CategoryID:     event.CategoryID,
-		Currency:       event.Currency,
-		PictureFileID:  event.PictureFileID,
-		PictureURL:     event.PictureURL,
-		PublishedAt:    event.PublishedAt,
-		CreatedAt:      event.CreatedAt,
-		UpdatedAt:      event.UpdatedAt,
+		ID:                    event.GigID,
+		FreelancerID:          event.FreelancerID,
+		SellerUsername:        event.SellerUsername,
+		Slug:                  event.Slug,
+		Title:                 event.Title,
+		ShortInfo:             event.ShortInfo,
+		Description:           event.Description,
+		CategoryID:            event.CategoryID,
+		Currency:              event.Currency,
+		Status:                event.Status,
+		BasicInfoCompleted:    event.BasicInfoCompleted,
+		PackagesCompleted:     event.PackagesCompleted,
+		RequirementsCompleted: event.RequirementsCompleted,
+		MediaCompleted:        event.MediaCompleted,
+		PictureFileID:         event.PictureFileID,
+		PictureURL:            event.PictureURL,
+		PublishedAt:           event.PublishedAt,
+		CreatedAt:             event.CreatedAt,
+		UpdatedAt:             event.UpdatedAt,
 	}
 
+	gig.Packages = make([]domain.GigPackage, 0, len(event.Packages))
+	gig.Questions = make([]domain.GigQuestion, 0, len(event.Questions))
+	gig.Media = make([]domain.GigMedia, 0, len(event.Media))
 	if len(event.Packages) > 0 {
 		gig.Packages = make([]domain.GigPackage, 0, len(event.Packages))
 		for _, pkg := range event.Packages {
@@ -272,6 +291,9 @@ func (m *gigEventMapper) FromReadModelPayload(payload []byte) (*domain.Gig, erro
 				SortOrder:    pkg.SortOrder,
 			})
 		}
+	}
+	for _, question := range event.Questions {
+		gig.Questions = append(gig.Questions, domain.GigQuestion{ID: question.ID, GigID: question.GigID, Content: question.Content, SortOrder: question.SortOrder})
 	}
 
 	if len(event.Media) > 0 {
@@ -318,22 +340,36 @@ type GigPublishedEvent struct {
 
 // GigReadModelEvent is the JSON payload stored in Redis for public gig reads.
 type GigReadModelEvent struct {
-	GigID          string                `json:"gig_id"`
-	FreelancerID   string                `json:"freelancer_id"`
-	SellerUsername string                `json:"seller_username"`
-	Slug           string                `json:"slug"`
-	Title          string                `json:"title"`
-	ShortInfo      string                `json:"short_info"`
-	Description    string                `json:"description"`
-	CategoryID     int64                 `json:"category_id"`
-	Currency       string                `json:"currency"`
-	PictureFileID  string                `json:"picture_file_id"`
-	PictureURL     string                `json:"picture_url,omitempty"`
-	PublishedAt    *time.Time            `json:"published_at,omitempty"`
-	CreatedAt      time.Time             `json:"created_at"`
-	UpdatedAt      time.Time             `json:"updated_at"`
-	Packages       []GigReadModelPackage `json:"packages"`
-	Media          []GigReadModelMedia   `json:"media"`
+	GigID                 string                 `json:"gig_id"`
+	FreelancerID          string                 `json:"freelancer_id"`
+	SellerUsername        string                 `json:"seller_username"`
+	Slug                  string                 `json:"slug"`
+	Title                 string                 `json:"title"`
+	ShortInfo             string                 `json:"short_info"`
+	Description           string                 `json:"description"`
+	CategoryID            int64                  `json:"category_id"`
+	Currency              string                 `json:"currency"`
+	Status                string                 `json:"status"`
+	BasicInfoCompleted    bool                   `json:"basic_info_completed"`
+	PackagesCompleted     bool                   `json:"packages_completed"`
+	RequirementsCompleted bool                   `json:"requirements_completed"`
+	MediaCompleted        bool                   `json:"media_completed"`
+	PictureFileID         string                 `json:"picture_file_id"`
+	PictureURL            string                 `json:"picture_url,omitempty"`
+	PublishedAt           *time.Time             `json:"published_at,omitempty"`
+	CreatedAt             time.Time              `json:"created_at"`
+	UpdatedAt             time.Time              `json:"updated_at"`
+	Packages              []GigReadModelPackage  `json:"packages"`
+	Questions             []GigReadModelQuestion `json:"questions"`
+	Media                 []GigReadModelMedia    `json:"media"`
+}
+
+// GigReadModelQuestion describes one requirement in the public gig cache.
+type GigReadModelQuestion struct {
+	ID        string `json:"id,omitempty"`
+	GigID     string `json:"gig_id,omitempty"`
+	Content   string `json:"content"`
+	SortOrder int32  `json:"sort_order"`
 }
 
 // GigReadModelPackage describes one package embedded in the public gig cache.

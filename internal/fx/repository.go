@@ -5,7 +5,7 @@ import (
 	"gig-service/internal/domain"
 	readrepo "gig-service/internal/infra/read/redis"
 	writerepo "gig-service/internal/infra/write/yugabyte"
-	events "gig-service/internal/presentation/event_broker/nats"
+	events "gig-service/internal/presentation/event_broker/kafka"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/ofm-microservices/ofm-common/pkg/logging"

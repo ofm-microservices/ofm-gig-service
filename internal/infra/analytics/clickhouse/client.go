@@ -14,6 +14,10 @@ import (
 	"gig-service/config"
 	app "gig-service/internal/application"
 	"github.com/ofm-microservices/ofm-common/pkg/logging"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type client struct {
@@ -43,6 +47,8 @@ func New(cfg config.ClickHouseConfig, log logging.Logger) (Client, error) {
 }
 
 func (c *client) ListPopularityRows(ctx context.Context) ([]app.PopularityRow, error) {
+	ctx, span := otel.Tracer("gig-service/database").Start(ctx, "clickhouse.select", trace.WithAttributes(attribute.String("db.system", "clickhouse"), attribute.String("db.operation", "select"), attribute.String("db.collection.name", c.cfg.Table)))
+	defer span.End()
 	query := `
 SELECT
     gig_id,
@@ -60,6 +66,8 @@ GROUP BY gig_id
 `
 	u, err := url.Parse(c.cfg.Endpoint)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 	q := u.Query()
@@ -69,17 +77,24 @@ GROUP BY gig_id
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewBufferString(""))
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 	req.SetBasicAuth(c.cfg.User, c.cfg.Password)
 	resp, err := c.http.Do(req)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("clickhouse query failed: %s: %s", resp.Status, strings.TrimSpace(string(body)))
+		err := fmt.Errorf("clickhouse query failed: %s: %s", resp.Status, strings.TrimSpace(string(body)))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
 	}
 
 	scanner := bufio.NewScanner(resp.Body)
