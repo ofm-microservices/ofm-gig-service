@@ -79,6 +79,7 @@ var _ = Describe("gigService", func() {
 		review = &fakeReviewClient{}
 		orders = &fakeOrderCountClient{}
 		broker = NewMockEventBroker(ctrl)
+		broker.EXPECT().Publish(gomock.Any(), realtimeSubject, gomock.AssignableToTypeOf([]byte{})).Return(nil).AnyTimes()
 		pop = fakePopularitySource{}
 		slugger = NewMockSlugger(ctrl)
 
@@ -280,6 +281,16 @@ var _ = Describe("gigService", func() {
 	})
 
 	Describe("ReplacePackages", func() {
+		It("rejects a recovery package without the externally assigned identity", func() {
+			repo.EXPECT().GetByID(gomock.Any(), "gig-1").Return(&domain.Gig{ID: "gig-1", FreelancerID: "freelancer-1"}, nil)
+
+			result, err := svc.ReplacePackages(WithRecoveryContext(ctx), "gig-1", "freelancer-1", domain.ReplacePackagesParams{
+				Packages: []domain.GigPackage{{Tier: domain.TierBasic, Description: "basic", DeliveryDays: 1, PriceCents: 100}},
+			})
+			Expect(result).To(BeNil())
+			Expect(err).To(MatchError(domain.ErrInvalidPackageID))
+		})
+
 		It("validates ownership and package payload", func() {
 			repo.EXPECT().GetByID(gomock.Any(), "gig-1").Return(&domain.Gig{ID: "gig-1", FreelancerID: "freelancer-1"}, nil)
 
@@ -587,6 +598,7 @@ var _ = Describe("gigService", func() {
 					Expect(parsed.Media[0].FileID).To(Equal("gallery-file"))
 					return nil
 				})
+			broker.EXPECT().Publish(gomock.Any(), realtimeSubject, gomock.AssignableToTypeOf([]byte{})).Return(nil).AnyTimes()
 			broker.EXPECT().Publish(gomock.Any(), gigProjectionRequestedSubject, gomock.AssignableToTypeOf([]byte{})).Return(nil)
 			broker.EXPECT().Publish(gomock.Any(), gigPreviewProjectionSubject, gomock.AssignableToTypeOf([]byte{})).Return(nil)
 

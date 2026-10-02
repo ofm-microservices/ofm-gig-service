@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/ofm-microservices/ofm-common/pkg/logging"
+	transportgrpc "github.com/ofm-microservices/ofm-common/pkg/observability/grpc"
 	"github.com/ofm-microservices/ofm-common/pkg/observability/metrics"
 	gigv1 "github.com/ofm-microservices/ofm-common/proto/gig/v1"
 	otelgrpc "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -42,7 +43,7 @@ func NewServer(svc GigService, cfg config.GRPCConfig, log logging.Logger) (Serve
 
 	grpcSrv := grpc.NewServer(
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
-		grpc.UnaryInterceptor(metrics.UnaryServerInterceptor()),
+		grpc.ChainUnaryInterceptor(metrics.UnaryServerInterceptor(), transportgrpc.UnaryServerInterceptor(log)),
 	)
 	s := &server{
 		svc:     svc,

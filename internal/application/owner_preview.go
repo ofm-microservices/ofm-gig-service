@@ -36,7 +36,7 @@ func (s *gigService) UpsertPreviewGig(ctx context.Context, gig *domain.Gig) erro
 			TotalReviews: cached.TotalReviews,
 		}
 		orderTotal = cached.OrderCount
-	} else {
+	} else if projected.Status == domain.StatusPublished && !isRecoveryContext(ctx) {
 		summary, sumErr := s.review.GetGigRatingSummary(ctx, projected.ID)
 		if sumErr == nil && summary != nil {
 			rating = summary

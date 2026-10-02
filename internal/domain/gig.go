@@ -63,6 +63,7 @@ type GigQuestion struct {
 
 // GigMedia describes one gallery media file attached to a gig.
 type GigMedia struct {
+	ID        string
 	GigID     string
 	FileID    string
 	URL       string
@@ -78,6 +79,7 @@ type MediaUpload struct {
 
 // CreateDraftParams identifies the freelancer starting a new draft.
 type CreateDraftParams struct {
+	GigID        string
 	FreelancerID string
 }
 

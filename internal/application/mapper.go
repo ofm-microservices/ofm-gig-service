@@ -314,6 +314,9 @@ func (m *gigEventMapper) FromReadModelPayload(payload []byte) (*domain.Gig, erro
 // GigPublishedEvent is the JSON payload published to gig.published and later
 // consumed by the gig projection subscriber.
 type GigPublishedEvent struct {
+	EventID               string                 `json:"event_id,omitempty"`
+	OperationID           string                 `json:"operation_id,omitempty"`
+	CorrelationID         string                 `json:"correlation_id,omitempty"`
 	GigID                 string                 `json:"gig_id"`
 	FreelancerID          string                 `json:"freelancer_id"`
 	SellerUsername        string                 `json:"seller_username"`
