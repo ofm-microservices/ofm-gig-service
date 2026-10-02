@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"gig-service/internal/domain"
-	"gig-service/internal/infra/write/yugabyte/model"
+	"gig-service/internal/infra/write/postgres/model"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -13,7 +13,7 @@ import (
 func TestMapper(t *testing.T) {
 	t.Helper()
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Gig Yugabyte Mapper Suite")
+	RunSpecs(t, "Gig PostgreSQL Mapper Suite")
 }
 
 var _ = Describe("gig row mapper", func() {

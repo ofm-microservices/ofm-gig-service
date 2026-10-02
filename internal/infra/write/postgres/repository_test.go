@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"gig-service/internal/domain"
-	"gig-service/internal/infra/write/yugabyte/mapper"
-	"gig-service/internal/infra/write/yugabyte/model"
+	"gig-service/internal/infra/write/postgres/mapper"
+	"gig-service/internal/infra/write/postgres/model"
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/uuid"
 	"github.com/jackc/pgerrcode"
@@ -32,7 +32,7 @@ func (uuidV7Arg) Match(v driver.Value) bool {
 	return err == nil && parsed.Version() == 7
 }
 
-var _ = Describe("yugabyte repository", func() {
+var _ = Describe("postgres repository", func() {
 	var (
 		db       *sql.DB
 		mock     sqlmock.Sqlmock
@@ -62,7 +62,7 @@ var _ = Describe("yugabyte repository", func() {
 	It("validates constructor dependencies", func() {
 		repo, err := New(nil, NewPgErrorTranslator(), lg)
 		Expect(repo).To(BeNil())
-		Expect(err).To(MatchError(ErrNilYugaByteDB))
+		Expect(err).To(MatchError(ErrNilPostgresDB))
 
 		repo, err = New(sqlxDB, nil, lg)
 		Expect(repo).To(BeNil())

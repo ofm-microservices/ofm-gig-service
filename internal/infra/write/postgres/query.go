@@ -8,6 +8,11 @@ const (
 			created_at, updated_at
 		)
 		VALUES ($1, $2, '', '', 'draft', '', FALSE, FALSE, FALSE, FALSE, NOW(), NOW())
+		ON CONFLICT (gig_id) DO UPDATE SET
+			freelancer_id = EXCLUDED.freelancer_id,
+			status = CASE WHEN gigs.status = 'published' THEN gigs.status ELSE EXCLUDED.status END,
+			published_at = gigs.published_at,
+			updated_at = NOW()
 		RETURNING gig_id, freelancer_id, seller_username, slug, title, short_info, description, category_id, currency, status,
 			basic_info_completed, packages_completed, requirements_completed, media_completed, picture_file_id,
 			published_at, created_at, updated_at

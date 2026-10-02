@@ -7,7 +7,9 @@ import (
 	eventbroker "gig-service/internal/presentation/event_broker"
 	kafkaevents "gig-service/internal/presentation/event_broker/kafka"
 	grpcserver "gig-service/internal/presentation/grpc"
+	"github.com/jmoiron/sqlx"
 	"github.com/ofm-microservices/ofm-common/pkg/logging"
+	"time"
 
 	"go.uber.org/fx"
 )
@@ -20,6 +22,7 @@ var PresentationModule = fx.Options(
 		ProvideGigPreviewProjectionSubscriber,
 		ProvideGigReviewRatingSubscriber,
 		ProvideGigOrderFundedSubscriber,
+		ProvideGigRecoverySubscriber,
 		ProvideGRPCServer,
 	),
 	fx.Invoke(
@@ -27,6 +30,7 @@ var PresentationModule = fx.Options(
 		InvokeSubscribeGigPreviewProjection,
 		InvokeSubscribeGigReviewRating,
 		InvokeSubscribeGigOrderFunded,
+		InvokeSubscribeGigRecovery,
 		InvokeWarmupSellerLookups,
 		InvokeRunPopularityMaterializer,
 		InvokeRunGRPCServer,
@@ -80,6 +84,49 @@ func ProvideGigOrderFundedSubscriber(
 	return kafkaevents.NewGigOrderFundedSubscriber(broker, svc, cfg.Kafka, lg)
 }
 
+// ProvideGigRecoverySubscriber constructs the gig-owned migration recovery consumer.
+func ProvideGigRecoverySubscriber(broker eventbroker.EventBroker, svc app.GigService, cfg *config.Config, lg logging.Logger, db *sqlx.DB) (kafkaevents.GigRecoverySubscriber, error) {
+	return kafkaevents.NewGigRecoverySubscriber(broker, svc, cfg.Kafka, lg, db)
+}
+
+// InvokeSubscribeGigRecovery starts the gig-owned recovery consumer.
+func InvokeSubscribeGigRecovery(lc fx.Lifecycle, subscriber kafkaevents.GigRecoverySubscriber, lg logging.Logger) {
+	var cancel context.CancelFunc
+	lc.Append(fx.Hook{
+		OnStart: func(context.Context) error {
+			runCtx, runCancel := context.WithCancel(context.Background())
+			cancel = runCancel
+			go func() {
+				backoff := time.Second
+				for runCtx.Err() == nil {
+					if err := subscriber.Subscribe(runCtx); err == nil || runCtx.Err() != nil {
+						return
+					} else {
+						lg.Error("subscribe to gig recovery failed; retrying", logging.Err(err), logging.String("error_text", err.Error()), logging.String("retry_in", backoff.String()))
+					}
+					timer := time.NewTimer(backoff)
+					select {
+					case <-runCtx.Done():
+						timer.Stop()
+						return
+					case <-timer.C:
+					}
+					if backoff < 30*time.Second {
+						backoff *= 2
+					}
+				}
+			}()
+			return nil
+		},
+		OnStop: func(context.Context) error {
+			if cancel != nil {
+				cancel()
+			}
+			return nil
+		},
+	})
+}
+
 // ProvideGRPCServer constructs the gRPC draft workflow server exposed by
 // gig-service.
 func ProvideGRPCServer(
@@ -104,8 +151,26 @@ func InvokeSubscribeGigProjection(
 			runCtx, runCancel := context.WithCancel(context.Background())
 			cancel = runCancel
 			go func() {
-				if err := subscriber.Subscribe(runCtx); err != nil && runCtx.Err() == nil {
-					lg.Error("subscribe to gig projection failed", logging.Err(err))
+				backoff := 100 * time.Millisecond
+				for runCtx.Err() == nil {
+					if err := subscriber.Subscribe(runCtx); err == nil || runCtx.Err() != nil {
+						return
+					} else {
+						lg.Error("subscribe to gig projection failed; reconnecting", logging.Err(err), logging.String("retry_in", backoff.String()))
+					}
+					timer := time.NewTimer(backoff)
+					select {
+					case <-runCtx.Done():
+						timer.Stop()
+						return
+					case <-timer.C:
+					}
+					if backoff < 5*time.Second {
+						backoff *= 2
+						if backoff > 5*time.Second {
+							backoff = 5 * time.Second
+						}
+					}
 				}
 			}()
 
@@ -137,8 +202,26 @@ func InvokeSubscribeGigPreviewProjection(
 			cancel = runCancel
 
 			go func() {
-				if err := subscriber.Subscribe(runCtx); err != nil && runCtx.Err() == nil {
-					lg.Error("subscribe to gig preview projection failed", logging.Err(err))
+				backoff := 100 * time.Millisecond
+				for runCtx.Err() == nil {
+					if err := subscriber.Subscribe(runCtx); err == nil || runCtx.Err() != nil {
+						return
+					} else {
+						lg.Error("subscribe to gig preview projection failed; reconnecting", logging.Err(err), logging.String("retry_in", backoff.String()))
+					}
+					timer := time.NewTimer(backoff)
+					select {
+					case <-runCtx.Done():
+						timer.Stop()
+						return
+					case <-timer.C:
+					}
+					if backoff < 5*time.Second {
+						backoff *= 2
+						if backoff > 5*time.Second {
+							backoff = 5 * time.Second
+						}
+					}
 				}
 			}()
 			return nil

@@ -4,8 +4,10 @@ import (
 	"context"
 	"gig-service/config"
 	rdb "gig-service/pkg/storage/redis"
-	ydb "gig-service/pkg/storage/yugabyte"
+	ydb "gig-service/pkg/storage/postgres"
 	"github.com/ofm-microservices/ofm-common/pkg/logging"
+	"strings"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/redis/go-redis/v9"
@@ -17,29 +19,38 @@ import (
 var StorageModule = fx.Options(
 	fx.Invoke(InvokeRunMigrations),
 	fx.Provide(
-		ProvideYugaByteDB,
+		ProvidePostgresDB,
 		ProvideRedisClient,
 	),
 )
 
 var runMigrations = ydb.RunMigrations
-var openYugaByteDB = ydb.Open
+var openPostgresDB = ydb.Open
 var openRedisClient = rdb.Open
 
 // InvokeRunMigrations applies the gig-service write-model migrations.
 func InvokeRunMigrations(cfg *config.Config, lg logging.Logger) error {
-	if err := runMigrations(cfg.DB); err != nil {
-		lg.Error("run migrations failed", logging.Err(err))
-		return err
+	const attempts = 10
+	for attempt := 1; attempt <= attempts; attempt++ {
+		err := runMigrations(cfg.DB)
+		if err == nil {
+			lg.Info("migrations applied")
+			return nil
+		}
+		if !strings.Contains(strings.ToLower(err.Error()), "deadlock") || attempt == attempts {
+			lg.Error("run migrations failed", logging.Err(err))
+			return err
+		}
+		backoff := time.Duration(attempt) * 2 * time.Second
+		lg.Warn("migration lock contention; retrying", logging.Err(err), logging.String("retry_in", backoff.String()))
+		time.Sleep(backoff)
 	}
-
-	lg.Info("migrations applied")
 	return nil
 }
 
-// ProvideYugaByteDB opens the YugabyteDB connection owned by gig-service.
-func ProvideYugaByteDB(lc fx.Lifecycle, cfg *config.Config, lg logging.Logger) (*sqlx.DB, error) {
-	dbx, err := openYugaByteDB(cfg.DB)
+// ProvidePostgresDB opens the PostgreSQL connection owned by gig-service.
+func ProvidePostgresDB(lc fx.Lifecycle, cfg *config.Config, lg logging.Logger) (*sqlx.DB, error) {
+	dbx, err := openPostgresDB(cfg.DB)
 	if err != nil {
 		lg.Error("open database failed", logging.Err(err))
 		return nil, err
