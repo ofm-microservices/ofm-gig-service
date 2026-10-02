@@ -16,7 +16,7 @@ type fakeMigrator struct{ upErr error }
 
 func (f fakeMigrator) Up() error { return f.upErr }
 
-var _ = Describe("yugabyte bootstrap", func() {
+var _ = Describe("postgres bootstrap", func() {
 	It("opens the db and applies settings", func() {
 		raw, mock, err := sqlmock.New()
 		Expect(err).NotTo(HaveOccurred())
@@ -24,7 +24,7 @@ var _ = Describe("yugabyte bootstrap", func() {
 
 		original := connectDB
 		connectDB = func(driverName, dsn string) (*sqlx.DB, error) {
-			Expect(driverName).To(Equal("pgx"))
+			Expect(driverName).To(HavePrefix("pgx-otelsql-"))
 			Expect(dsn).To(ContainSubstring("postgres://user:pass@db:5433/gig_service"))
 			return sqlx.NewDb(raw, "sqlmock"), nil
 		}
@@ -60,7 +60,7 @@ var _ = Describe("yugabyte bootstrap", func() {
 		original := newMigrator
 		newMigrator = func(sourceURL, databaseURL string) (migrator, error) {
 			Expect(sourceURL).To(HavePrefix("file://"))
-			Expect(databaseURL).To(ContainSubstring("yugabytedb://user:pass@db:5433/gig_service"))
+			Expect(databaseURL).To(ContainSubstring("postgres://user:pass@db:5433/gig_service"))
 			return fakeMigrator{}, nil
 		}
 		DeferCleanup(func() { newMigrator = original })
@@ -72,7 +72,7 @@ var _ = Describe("yugabyte bootstrap", func() {
 			Password:        "pass",
 			Name:            "gig_service",
 			SSLMode:         "disable",
-			MigrationsPath:  "file://migration/yugabyte",
+			MigrationsPath:  "file://migration/postgres",
 			MigrationsTable: "schema_migrations_gig_service",
 		})).To(Succeed())
 	})

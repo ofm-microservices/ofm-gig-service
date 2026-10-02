@@ -2,7 +2,7 @@ package model
 
 import "time"
 
-// GigRow is the Yugabyte persistence model for the gig write model.
+// GigRow is the PostgreSQL persistence model for the gig write model.
 type GigRow struct {
 	ID                    string     `db:"gig_id"`
 	FreelancerID          string     `db:"freelancer_id"`
@@ -24,7 +24,7 @@ type GigRow struct {
 	UpdatedAt             time.Time  `db:"updated_at"`
 }
 
-// GigPackageRow is the Yugabyte persistence model for gig packages.
+// GigPackageRow is the PostgreSQL persistence model for gig packages.
 type GigPackageRow struct {
 	ID           string    `db:"package_id"`
 	GigID        string    `db:"gig_id"`
@@ -37,7 +37,7 @@ type GigPackageRow struct {
 	UpdatedAt    time.Time `db:"updated_at"`
 }
 
-// GigQuestionRow is the Yugabyte persistence model for gig questions.
+// GigQuestionRow is the PostgreSQL persistence model for gig questions.
 type GigQuestionRow struct {
 	ID        string    `db:"question_id"`
 	GigID     string    `db:"gig_id"`
@@ -47,7 +47,7 @@ type GigQuestionRow struct {
 	UpdatedAt time.Time `db:"updated_at"`
 }
 
-// GigMediaRow is the Yugabyte persistence model for gig gallery file IDs.
+// GigMediaRow is the PostgreSQL persistence model for gig gallery file IDs.
 type GigMediaRow struct {
 	ID        string    `db:"media_id"`
 	GigID     string    `db:"gig_id"`

@@ -1,6 +1,6 @@
 package repository
 
-// DBErrorTranslator maps low-level Yugabyte errors into domain-aware
+// DBErrorTranslator maps low-level PostgreSQL errors into domain-aware
 // repository errors.
 type DBErrorTranslator interface {
 	TranslateCreateGigError(err error) error

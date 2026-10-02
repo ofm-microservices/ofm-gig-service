@@ -9,4 +9,7 @@ type KafkaConfig struct {
 	ReviewRatingTopic         string   `env:"KAFKA_GIG_REVIEW_RATING_TOPIC" envDefault:"review.rating.gig"`
 	OrderFundedTopic          string   `env:"KAFKA_GIG_ORDER_FUNDED_TOPIC" envDefault:"order.funded"`
 	DeadLetterTopic           string   `env:"KAFKA_GIG_DLQ_TOPIC" envDefault:"gig-service.dead-letter"`
+	RecoveryTopic             string   `env:"KAFKA_GIG_RECOVERY_TOPIC" envDefault:"migration.recovery.commands.gig"`
+	RecoveryGroup             string   `env:"KAFKA_GIG_RECOVERY_GROUP" envDefault:"gig-service-recovery"`
+	RecoveryCompletedTopic    string   `env:"KAFKA_GIG_RECOVERY_COMPLETED_TOPIC" envDefault:"migration.recovery.completed"`
 }

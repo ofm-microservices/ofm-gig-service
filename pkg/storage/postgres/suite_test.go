@@ -1,4 +1,4 @@
-package repository
+package db
 
 import (
 	"testing"
@@ -7,8 +7,8 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestYugabyteRepository(t *testing.T) {
+func TestPostgreSQLStorage(t *testing.T) {
 	t.Helper()
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Gig Yugabyte Repository Suite")
+	RunSpecs(t, "Gig PostgreSQL Storage Suite")
 }

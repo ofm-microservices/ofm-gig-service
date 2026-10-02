@@ -15,7 +15,7 @@ var LoggerModule = fx.Options(
 
 // ProvideLogger builds the service logger from runtime configuration.
 func ProvideLogger(lc fx.Lifecycle, cfg *config.Config) (logging.Logger, error) {
-	lg, err := logging.New("gig-service", cfg.App.Env, cfg.App.LogLevel)
+	lg, err := logging.NewWithMode("gig-service", cfg.App.Env, cfg.App.ObservabilityMode, cfg.App.LogLevel)
 	if err != nil {
 		return nil, err
 	}

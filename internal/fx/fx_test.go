@@ -230,11 +230,11 @@ var _ = Describe("fx providers and invokes", func() {
 
 	It("boots the migration and storage providers", func() {
 		originalRun := runMigrations
-		originalOpenYB := openYugaByteDB
+		originalOpenYB := openPostgresDB
 		originalOpenRedis := openRedisClient
 		DeferCleanup(func() {
 			runMigrations = originalRun
-			openYugaByteDB = originalOpenYB
+			openPostgresDB = originalOpenYB
 			openRedisClient = originalOpenRedis
 		})
 
@@ -247,9 +247,9 @@ var _ = Describe("fx providers and invokes", func() {
 		Expect(err).NotTo(HaveOccurred())
 		defer raw.Close()
 		_ = mock
-		openYugaByteDB = func(config.DBConfig) (*sqlx.DB, error) { return sqlx.NewDb(raw, "sqlmock"), nil }
+		openPostgresDB = func(config.DBConfig) (*sqlx.DB, error) { return sqlx.NewDb(raw, "sqlmock"), nil }
 		lc := &fakeLifecycle{}
-		dbx, err := ProvideYugaByteDB(lc, &config.Config{DB: config.DBConfig{}}, lg)
+		dbx, err := ProvidePostgresDB(lc, &config.Config{DB: config.DBConfig{}}, lg)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(dbx).NotTo(BeNil())
 		Expect(lc.hooks).To(HaveLen(1))
@@ -273,19 +273,19 @@ var _ = Describe("fx providers and invokes", func() {
 
 	It("reports storage provider failures", func() {
 		originalRun := runMigrations
-		originalOpenYB := openYugaByteDB
+		originalOpenYB := openPostgresDB
 		originalOpenRedis := openRedisClient
 		DeferCleanup(func() {
 			runMigrations = originalRun
-			openYugaByteDB = originalOpenYB
+			openPostgresDB = originalOpenYB
 			openRedisClient = originalOpenRedis
 		})
 
 		runMigrations = func(config.DBConfig) error { return errors.New("boom") }
 		Expect(InvokeRunMigrations(&config.Config{DB: config.DBConfig{}}, lg)).To(MatchError(ContainSubstring("boom")))
 
-		openYugaByteDB = func(config.DBConfig) (*sqlx.DB, error) { return nil, errors.New("db") }
-		dbx, err := ProvideYugaByteDB(&fakeLifecycle{}, &config.Config{DB: config.DBConfig{}}, lg)
+		openPostgresDB = func(config.DBConfig) (*sqlx.DB, error) { return nil, errors.New("db") }
+		dbx, err := ProvidePostgresDB(&fakeLifecycle{}, &config.Config{DB: config.DBConfig{}}, lg)
 		Expect(dbx).To(BeNil())
 		Expect(err).To(MatchError(ContainSubstring("db")))
 
