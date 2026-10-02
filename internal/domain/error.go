@@ -13,10 +13,12 @@ var (
 	ErrInvalidCategoryID           = errors.New("invalid category id")
 	ErrInvalidCurrency             = errors.New("invalid currency")
 	ErrInvalidPackageTier          = errors.New("invalid package tier")
+	ErrInvalidPackageID            = errors.New("invalid package id")
 	ErrInvalidPackageDescription   = errors.New("invalid package description")
 	ErrInvalidPackageDeliveryDays  = errors.New("invalid package delivery days")
 	ErrInvalidPackagePriceCents    = errors.New("invalid package price cents")
 	ErrInvalidQuestionContent      = errors.New("invalid question content")
+	ErrInvalidQuestionID           = errors.New("invalid question id")
 	ErrInvalidMediaUpload          = errors.New("invalid media upload")
 	ErrInvalidFileID               = errors.New("invalid file id")
 	ErrInvalidMediaRef             = ErrInvalidFileID

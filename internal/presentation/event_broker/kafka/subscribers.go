@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/ofm-microservices/ofm-common/pkg/logging"
+	commonrealtime "github.com/ofm-microservices/ofm-common/pkg/realtime"
 	orderflowv1 "github.com/ofm-microservices/ofm-common/proto/orderflow/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -113,6 +114,11 @@ func (s *gigProjectionSubscriber) Subscribe(ctx context.Context) error {
 }
 
 func (s *gigProjectionSubscriber) handle(ctx context.Context, _ string, payload []byte) error {
+	var metadata struct {
+		OperationID   string `json:"operation_id"`
+		CorrelationID string `json:"correlation_id"`
+	}
+	_ = json.Unmarshal(payload, &metadata)
 	gig, err := s.mapr.FromPublishedPayload(payload)
 	if err != nil {
 		return err
@@ -122,9 +128,19 @@ func (s *gigProjectionSubscriber) handle(ctx context.Context, _ string, payload 
 	}
 	projected, err := s.svc.Project(ctx, gig)
 	if err != nil {
+		retryable := true
+		_ = app.PublishGigNotificationOutcome(ctx, s.broker, gig, "gig.operation_failed", commonrealtime.StatusFailed, "projection_failed", metadata.OperationID, metadata.CorrelationID, &retryable, nil)
 		return err
 	}
-	return s.writer.Upsert(ctx, projected)
+	if err := s.writer.Upsert(ctx, projected); err != nil {
+		retryable := true
+		_ = app.PublishGigNotificationOutcome(ctx, s.broker, gig, "gig.operation_failed", commonrealtime.StatusFailed, "projection_write_failed", metadata.OperationID, metadata.CorrelationID, &retryable, nil)
+		return err
+	}
+	if err := app.PublishGigNotificationOutcome(ctx, s.broker, projected, "gig.projection_completed", commonrealtime.StatusCompleted, "", metadata.OperationID, metadata.CorrelationID, nil, nil); err != nil {
+		s.log.Warn("gig projection completion notification publish failed", logging.String("gig_id", gig.ID), logging.Err(err))
+	}
+	return nil
 }
 
 type gigPreviewProjectionSubscriber struct {

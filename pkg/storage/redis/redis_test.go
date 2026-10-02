@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"time"
 
 	"gig-service/config"
 	"github.com/alicebob/miniredis/v2"
@@ -29,7 +30,9 @@ var _ = Describe("redis bootstrap", func() {
 	})
 
 	It("wraps ping errors", func() {
-		client, err := Open(context.Background(), config.RedisConfig{Host: "127.0.0.1", Port: 1})
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
+		client, err := Open(ctx, config.RedisConfig{Host: "127.0.0.1", Port: 1})
 		Expect(client).To(BeNil())
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("ping redis"))

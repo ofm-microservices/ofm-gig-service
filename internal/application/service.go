@@ -2,10 +2,12 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"gig-service/config"
 	"gig-service/internal/domain"
 	"github.com/ofm-microservices/ofm-common/pkg/logging"
+	commonrealtime "github.com/ofm-microservices/ofm-common/pkg/realtime"
 	"strings"
 	"time"
 )
@@ -90,18 +92,32 @@ func New(repo domain.GigRepository, readRepo domain.GigReadRepository, files Fil
 }
 
 func (s *gigService) CreateDraft(ctx context.Context, freelancerID string) (*domain.Gig, error) {
+	return s.createDraft(ctx, "", freelancerID)
+}
+
+// CreateDraftWithID replays a fallback create under the UUID already exposed
+// by the monolith, preserving identity for subsequent recovery commands.
+func (s *gigService) CreateDraftWithID(ctx context.Context, gigID, freelancerID string) (*domain.Gig, error) {
+	return s.createDraft(ctx, gigID, freelancerID)
+}
+
+func (s *gigService) createDraft(ctx context.Context, gigID, freelancerID string) (*domain.Gig, error) {
 	freelancerID = strings.TrimSpace(freelancerID)
 	if freelancerID == "" {
 		return nil, domain.ErrInvalidFreelancerID
 	}
 
-	gig, err := s.repo.CreateDraft(ctx, domain.CreateDraftParams{FreelancerID: freelancerID})
+	gig, err := s.repo.CreateDraft(ctx, domain.CreateDraftParams{GigID: gigID, FreelancerID: freelancerID})
 	if err != nil {
 		s.log.Error("failed to create gig draft", logging.String("freelancer_id", freelancerID), logging.Err(err))
 		return nil, err
 	}
-	if err := s.publishPreviewProjection(ctx, gig); err != nil {
+	if err := s.publishPostWritePreview(ctx, gig); err != nil {
 		return nil, err
+	}
+	if err := PublishGigNotification(ctx, s.broker, gig, "gig.created", nil); err != nil {
+		s.log.Error("gig created realtime notification publish failed",
+			logging.Operation("gig.created"), logging.String("gig_id", gig.ID), logging.Err(err))
 	}
 
 	return gig, nil
@@ -148,10 +164,7 @@ func (s *gigService) UpdateBasicInfo(ctx context.Context, gigID, freelancerID st
 	if err != nil {
 		return nil, err
 	}
-	if err := s.publishProjection(ctx, gig); err != nil {
-		return nil, err
-	}
-	if err := s.publishPreviewProjection(ctx, gig); err != nil {
+	if err := s.publishPostWriteProjections(ctx, gig); err != nil {
 		return nil, err
 	}
 
@@ -165,12 +178,19 @@ func (s *gigService) ReplacePackages(ctx context.Context, gigID, freelancerID st
 	}
 	normalizedPackages := make([]domain.GigPackage, 0, len(params.Packages))
 	for i, pkg := range params.Packages {
+		packageID := strings.TrimSpace(pkg.ID)
+		if packageID == "" && isRecoveryContext(ctx) {
+			// Recovery must replay the identity allocated by the monolith. A
+			// missing ID is corruption in the command, not permission to create
+			// a second package identity in the projection.
+			return nil, domain.ErrInvalidPackageID
+		}
 		tier := strings.TrimSpace(pkg.Tier)
 		if tier == "" {
 			return nil, domain.ErrInvalidPackageTier
 		}
 		normalizedPackages = append(normalizedPackages, domain.GigPackage{
-			ID:           strings.TrimSpace(pkg.ID),
+			ID:           packageID,
 			GigID:        strings.TrimSpace(pkg.GigID),
 			Tier:         tier,
 			Description:  strings.TrimSpace(pkg.Description),
@@ -188,10 +208,7 @@ func (s *gigService) ReplacePackages(ctx context.Context, gigID, freelancerID st
 	if err != nil {
 		return nil, err
 	}
-	if err := s.publishProjection(ctx, gig); err != nil {
-		return nil, err
-	}
-	if err := s.publishPreviewProjection(ctx, gig); err != nil {
+	if err := s.publishPostWriteProjections(ctx, gig); err != nil {
 		return nil, err
 	}
 
@@ -204,6 +221,9 @@ func (s *gigService) ReplaceQuestions(ctx context.Context, gigID, freelancerID s
 		return nil, err
 	}
 	for _, q := range params.Questions {
+		if strings.TrimSpace(q.ID) == "" && isRecoveryContext(ctx) {
+			return nil, domain.ErrInvalidQuestionID
+		}
 		if strings.TrimSpace(q.Content) == "" {
 			return nil, domain.ErrInvalidQuestionContent
 		}
@@ -213,10 +233,7 @@ func (s *gigService) ReplaceQuestions(ctx context.Context, gigID, freelancerID s
 	if err != nil {
 		return nil, err
 	}
-	if err := s.publishProjection(ctx, gig); err != nil {
-		return nil, err
-	}
-	if err := s.publishPreviewProjection(ctx, gig); err != nil {
+	if err := s.publishPostWriteProjections(ctx, gig); err != nil {
 		return nil, err
 	}
 
@@ -249,10 +266,7 @@ func (s *gigService) ReplaceMedia(ctx context.Context, gigID, freelancerID strin
 		s.compensateUploadedFiles(ctx, fileIDs)
 		return nil, err
 	}
-	if err := s.publishProjection(ctx, gig); err != nil {
-		return nil, err
-	}
-	if err := s.publishPreviewProjection(ctx, gig); err != nil {
+	if err := s.publishPostWriteProjections(ctx, gig); err != nil {
 		return nil, err
 	}
 
@@ -457,13 +471,15 @@ func (s *gigService) Publish(ctx context.Context, gigID, freelancerID, username 
 	if err := validatePublishReady(gig); err != nil {
 		return nil, err
 	}
-	status, err := s.connect.GetConnectStatus(ctx, gig.FreelancerID)
-	if err != nil {
-		s.log.Error("failed to check connect onboarding status", logging.String("freelancer_id", gig.FreelancerID), logging.Err(err))
-		return nil, err
-	}
-	if status == nil || status.Status != "completed" {
-		return nil, domain.ErrConnectOnboardingIncomplete
+	if !isRecoveryContext(ctx) {
+		status, err := s.connect.GetConnectStatus(ctx, gig.FreelancerID)
+		if err != nil {
+			s.log.Error("failed to check connect onboarding status", logging.String("freelancer_id", gig.FreelancerID), logging.Err(err))
+			return nil, err
+		}
+		if status == nil || status.Status != "completed" {
+			return nil, domain.ErrConnectOnboardingIncomplete
+		}
 	}
 
 	gig, err = s.repo.Publish(ctx, gig.ID)
@@ -484,13 +500,29 @@ func (s *gigService) Publish(ctx context.Context, gigID, freelancerID, username 
 	if err != nil {
 		return nil, err
 	}
+	operation := commonrealtime.New(ctx, "gig.published", "gig", gig.ID, gig.FreelancerID, payload)
+	var published GigPublishedEvent
+	if err := json.Unmarshal(payload, &published); err != nil {
+		return nil, err
+	}
+	published.EventID = operation.EventID
+	published.OperationID = operation.OperationID
+	published.CorrelationID = operation.CorrelationID
+	payload, err = json.Marshal(published)
+	if err != nil {
+		return nil, err
+	}
 	if err := s.broker.Publish(ctx, gigPublishedSubject, payload); err != nil {
 		return nil, err
 	}
-	if err := s.publishProjection(ctx, gig); err != nil {
-		return nil, err
+	if err := PublishGigNotification(ctx, s.broker, gig, "gig.published", payload); err != nil {
+		s.log.Error("gig realtime notification publish failed",
+			logging.Operation("gig.published"),
+			logging.String("gig_id", gig.ID),
+			logging.Err(err),
+		)
 	}
-	if err := s.publishPreviewProjection(ctx, gig); err != nil {
+	if err := s.publishPostWriteProjections(ctx, gig); err != nil {
 		return nil, err
 	}
 
@@ -560,6 +592,43 @@ func (s *gigService) publishPreviewProjection(ctx context.Context, gig *domain.G
 		return err
 	}
 	return s.broker.Publish(ctx, gigPreviewProjectionSubject, payload)
+}
+
+func (s *gigService) publishPostWriteProjections(ctx context.Context, gig *domain.Gig) error {
+	payload, err := s.mapr.ToPublishedPayload(gig)
+	if err != nil {
+		return err
+	}
+	operation := commonrealtime.New(ctx, "gig.updated", "gig", gig.ID, gig.FreelancerID, payload)
+	var event GigPublishedEvent
+	if err := json.Unmarshal(payload, &event); err != nil {
+		return err
+	}
+	event.EventID = operation.EventID
+	event.OperationID = operation.OperationID
+	event.CorrelationID = operation.CorrelationID
+	payload, err = json.Marshal(event)
+	if err != nil {
+		return err
+	}
+	if err := s.broker.Publish(ctx, gigProjectionRequestedSubject, payload); err != nil {
+		return err
+	}
+	if err := s.broker.Publish(ctx, gigPreviewProjectionSubject, payload); err != nil {
+		return err
+	}
+	if err := PublishGigNotificationOutcome(ctx, s.broker, gig, "gig.updated", commonrealtime.StatusAccepted, "", operation.OperationID, operation.CorrelationID, nil, payload); err != nil {
+		s.log.Error("gig updated realtime notification publish failed",
+			logging.Operation("gig.updated"), logging.String("gig_id", gig.ID), logging.Err(err))
+	}
+	return nil
+}
+
+func (s *gigService) publishPostWritePreview(ctx context.Context, gig *domain.Gig) error {
+	if !isRecoveryContext(ctx) {
+		return s.publishPreviewProjection(ctx, gig)
+	}
+	return s.publishPreviewProjection(ctx, gig)
 }
 
 func (s *gigService) AppendPreviewGig(ctx context.Context, gig *domain.Gig) error {
