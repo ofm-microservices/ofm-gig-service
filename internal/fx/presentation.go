@@ -5,9 +5,11 @@ import (
 	"gig-service/config"
 	app "gig-service/internal/application"
 	eventbroker "gig-service/internal/presentation/event_broker"
-	events "gig-service/internal/presentation/event_broker/nats"
+	kafkaevents "gig-service/internal/presentation/event_broker/kafka"
 	grpcserver "gig-service/internal/presentation/grpc"
+	"github.com/jmoiron/sqlx"
 	"github.com/ofm-microservices/ofm-common/pkg/logging"
+	"time"
 
 	"go.uber.org/fx"
 )
@@ -20,6 +22,7 @@ var PresentationModule = fx.Options(
 		ProvideGigPreviewProjectionSubscriber,
 		ProvideGigReviewRatingSubscriber,
 		ProvideGigOrderFundedSubscriber,
+		ProvideGigRecoverySubscriber,
 		ProvideGRPCServer,
 	),
 	fx.Invoke(
@@ -27,26 +30,27 @@ var PresentationModule = fx.Options(
 		InvokeSubscribeGigPreviewProjection,
 		InvokeSubscribeGigReviewRating,
 		InvokeSubscribeGigOrderFunded,
+		InvokeSubscribeGigRecovery,
 		InvokeWarmupSellerLookups,
 		InvokeRunPopularityMaterializer,
 		InvokeRunGRPCServer,
 	),
 )
 
-// ProvideGigProjectionSubscriber constructs the NATS subscriber that projects
+// ProvideGigProjectionSubscriber constructs the Kafka subscriber that projects
 // published gig events into Redis.
 func ProvideGigProjectionSubscriber(
 	broker eventbroker.EventBroker,
 	svc app.GigService,
-	writer events.ProjectionWriter,
+	writer kafkaevents.ProjectionWriter,
 	mapr app.GigEventMapper,
 	cfg *config.Config,
 	lg logging.Logger,
-) (events.GigProjectionSubscriber, error) {
-	return events.NewGigProjectionSubscriber(broker, svc, writer, mapr, cfg.NATS, lg)
+) (kafkaevents.GigProjectionSubscriber, error) {
+	return kafkaevents.NewGigProjectionSubscriber(broker, svc, writer, mapr, cfg.Kafka, lg)
 }
 
-// ProvideGigPreviewProjectionSubscriber constructs the NATS subscriber that
+// ProvideGigPreviewProjectionSubscriber constructs the Kafka subscriber that
 // seeds the freelancer preview cache after publish.
 func ProvideGigPreviewProjectionSubscriber(
 	broker eventbroker.EventBroker,
@@ -54,30 +58,73 @@ func ProvideGigPreviewProjectionSubscriber(
 	mapr app.GigEventMapper,
 	cfg *config.Config,
 	lg logging.Logger,
-) (events.GigPreviewProjectionSubscriber, error) {
-	return events.NewGigPreviewProjectionSubscriber(broker, svc, mapr, cfg.NATS, lg)
+) (kafkaevents.GigPreviewProjectionSubscriber, error) {
+	return kafkaevents.NewGigPreviewProjectionSubscriber(broker, svc, mapr, cfg.Kafka, lg)
 }
 
-// ProvideGigReviewRatingSubscriber constructs the NATS subscriber that refreshes
+// ProvideGigReviewRatingSubscriber constructs the Kafka subscriber that refreshes
 // owner gig previews after review rating updates.
 func ProvideGigReviewRatingSubscriber(
 	broker eventbroker.EventBroker,
 	svc app.GigService,
 	cfg *config.Config,
 	lg logging.Logger,
-) (events.GigReviewRatingSubscriber, error) {
-	return events.NewGigReviewRatingSubscriber(broker, svc, cfg.NATS, lg)
+) (kafkaevents.GigReviewRatingSubscriber, error) {
+	return kafkaevents.NewGigReviewRatingSubscriber(broker, svc, cfg.Kafka, lg)
 }
 
-// ProvideGigOrderFundedSubscriber constructs the NATS subscriber that
+// ProvideGigOrderFundedSubscriber constructs the Kafka subscriber that
 // refreshes owner gig previews after the canonical post-payment order event.
 func ProvideGigOrderFundedSubscriber(
 	broker eventbroker.EventBroker,
 	svc app.GigService,
 	cfg *config.Config,
 	lg logging.Logger,
-) (events.GigOrderCountSubscriber, error) {
-	return events.NewGigOrderFundedSubscriber(broker, svc, cfg.NATS, lg)
+) (kafkaevents.GigOrderCountSubscriber, error) {
+	return kafkaevents.NewGigOrderFundedSubscriber(broker, svc, cfg.Kafka, lg)
+}
+
+// ProvideGigRecoverySubscriber constructs the gig-owned migration recovery consumer.
+func ProvideGigRecoverySubscriber(broker eventbroker.EventBroker, svc app.GigService, cfg *config.Config, lg logging.Logger, db *sqlx.DB) (kafkaevents.GigRecoverySubscriber, error) {
+	return kafkaevents.NewGigRecoverySubscriber(broker, svc, cfg.Kafka, lg, db)
+}
+
+// InvokeSubscribeGigRecovery starts the gig-owned recovery consumer.
+func InvokeSubscribeGigRecovery(lc fx.Lifecycle, subscriber kafkaevents.GigRecoverySubscriber, lg logging.Logger) {
+	var cancel context.CancelFunc
+	lc.Append(fx.Hook{
+		OnStart: func(context.Context) error {
+			runCtx, runCancel := context.WithCancel(context.Background())
+			cancel = runCancel
+			go func() {
+				backoff := time.Second
+				for runCtx.Err() == nil {
+					if err := subscriber.Subscribe(runCtx); err == nil || runCtx.Err() != nil {
+						return
+					} else {
+						lg.Error("subscribe to gig recovery failed; retrying", logging.Err(err), logging.String("error_text", err.Error()), logging.String("retry_in", backoff.String()))
+					}
+					timer := time.NewTimer(backoff)
+					select {
+					case <-runCtx.Done():
+						timer.Stop()
+						return
+					case <-timer.C:
+					}
+					if backoff < 30*time.Second {
+						backoff *= 2
+					}
+				}
+			}()
+			return nil
+		},
+		OnStop: func(context.Context) error {
+			if cancel != nil {
+				cancel()
+			}
+			return nil
+		},
+	})
 }
 
 // ProvideGRPCServer constructs the gRPC draft workflow server exposed by
@@ -93,7 +140,7 @@ func ProvideGRPCServer(
 // InvokeSubscribeGigProjection starts the gig projection pull consumer.
 func InvokeSubscribeGigProjection(
 	lc fx.Lifecycle,
-	subscriber events.GigProjectionSubscriber,
+	subscriber kafkaevents.GigProjectionSubscriber,
 	cfg *config.Config,
 	lg logging.Logger,
 ) {
@@ -103,12 +150,29 @@ func InvokeSubscribeGigProjection(
 		OnStart: func(context.Context) error {
 			runCtx, runCancel := context.WithCancel(context.Background())
 			cancel = runCancel
-
-			if err := subscriber.Subscribe(runCtx); err != nil {
-				lg.Error("subscribe to gig projection failed", logging.Err(err))
-				cancel()
-				return err
-			}
+			go func() {
+				backoff := 100 * time.Millisecond
+				for runCtx.Err() == nil {
+					if err := subscriber.Subscribe(runCtx); err == nil || runCtx.Err() != nil {
+						return
+					} else {
+						lg.Error("subscribe to gig projection failed; reconnecting", logging.Err(err), logging.String("retry_in", backoff.String()))
+					}
+					timer := time.NewTimer(backoff)
+					select {
+					case <-runCtx.Done():
+						timer.Stop()
+						return
+					case <-timer.C:
+					}
+					if backoff < 5*time.Second {
+						backoff *= 2
+						if backoff > 5*time.Second {
+							backoff = 5 * time.Second
+						}
+					}
+				}
+			}()
 
 			lg.Info("gig-service initialized", logging.String("env", cfg.App.Env))
 			return nil
@@ -126,7 +190,7 @@ func InvokeSubscribeGigProjection(
 // consumer.
 func InvokeSubscribeGigPreviewProjection(
 	lc fx.Lifecycle,
-	subscriber events.GigPreviewProjectionSubscriber,
+	subscriber kafkaevents.GigPreviewProjectionSubscriber,
 	cfg *config.Config,
 	lg logging.Logger,
 ) {
@@ -137,11 +201,29 @@ func InvokeSubscribeGigPreviewProjection(
 			runCtx, runCancel := context.WithCancel(context.Background())
 			cancel = runCancel
 
-			if err := subscriber.Subscribe(runCtx); err != nil {
-				lg.Error("subscribe to gig preview projection failed", logging.Err(err))
-				cancel()
-				return err
-			}
+			go func() {
+				backoff := 100 * time.Millisecond
+				for runCtx.Err() == nil {
+					if err := subscriber.Subscribe(runCtx); err == nil || runCtx.Err() != nil {
+						return
+					} else {
+						lg.Error("subscribe to gig preview projection failed; reconnecting", logging.Err(err), logging.String("retry_in", backoff.String()))
+					}
+					timer := time.NewTimer(backoff)
+					select {
+					case <-runCtx.Done():
+						timer.Stop()
+						return
+					case <-timer.C:
+					}
+					if backoff < 5*time.Second {
+						backoff *= 2
+						if backoff > 5*time.Second {
+							backoff = 5 * time.Second
+						}
+					}
+				}
+			}()
 			return nil
 		},
 		OnStop: func(context.Context) error {
@@ -156,7 +238,7 @@ func InvokeSubscribeGigPreviewProjection(
 // InvokeSubscribeGigReviewRating starts the gig review rating pull consumer.
 func InvokeSubscribeGigReviewRating(
 	lc fx.Lifecycle,
-	subscriber events.GigReviewRatingSubscriber,
+	subscriber kafkaevents.GigReviewRatingSubscriber,
 	lg logging.Logger,
 ) {
 	var cancel context.CancelFunc
@@ -166,11 +248,11 @@ func InvokeSubscribeGigReviewRating(
 			runCtx, runCancel := context.WithCancel(context.Background())
 			cancel = runCancel
 
-			if err := subscriber.Subscribe(runCtx); err != nil {
-				lg.Error("subscribe to gig review rating failed", logging.Err(err))
-				cancel()
-				return err
-			}
+			go func() {
+				if err := subscriber.Subscribe(runCtx); err != nil && runCtx.Err() == nil {
+					lg.Error("subscribe to gig review rating failed", logging.Err(err))
+				}
+			}()
 			return nil
 		},
 		OnStop: func(context.Context) error {
@@ -185,7 +267,7 @@ func InvokeSubscribeGigReviewRating(
 // InvokeSubscribeGigOrderFunded starts the gig order count pull consumer.
 func InvokeSubscribeGigOrderFunded(
 	lc fx.Lifecycle,
-	subscriber events.GigOrderCountSubscriber,
+	subscriber kafkaevents.GigOrderCountSubscriber,
 	lg logging.Logger,
 ) {
 	var cancel context.CancelFunc
@@ -195,11 +277,11 @@ func InvokeSubscribeGigOrderFunded(
 			runCtx, runCancel := context.WithCancel(context.Background())
 			cancel = runCancel
 
-			if err := subscriber.Subscribe(runCtx); err != nil {
-				lg.Error("subscribe to gig order funded failed", logging.Err(err))
-				cancel()
-				return err
-			}
+			go func() {
+				if err := subscriber.Subscribe(runCtx); err != nil && runCtx.Err() == nil {
+					lg.Error("subscribe to gig order funded failed", logging.Err(err))
+				}
+			}()
 			return nil
 		},
 		OnStop: func(context.Context) error {

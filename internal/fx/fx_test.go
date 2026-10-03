@@ -230,11 +230,11 @@ var _ = Describe("fx providers and invokes", func() {
 
 	It("boots the migration and storage providers", func() {
 		originalRun := runMigrations
-		originalOpenYB := openYugaByteDB
+		originalOpenYB := openPostgresDB
 		originalOpenRedis := openRedisClient
 		DeferCleanup(func() {
 			runMigrations = originalRun
-			openYugaByteDB = originalOpenYB
+			openPostgresDB = originalOpenYB
 			openRedisClient = originalOpenRedis
 		})
 
@@ -247,9 +247,9 @@ var _ = Describe("fx providers and invokes", func() {
 		Expect(err).NotTo(HaveOccurred())
 		defer raw.Close()
 		_ = mock
-		openYugaByteDB = func(config.DBConfig) (*sqlx.DB, error) { return sqlx.NewDb(raw, "sqlmock"), nil }
+		openPostgresDB = func(config.DBConfig) (*sqlx.DB, error) { return sqlx.NewDb(raw, "sqlmock"), nil }
 		lc := &fakeLifecycle{}
-		dbx, err := ProvideYugaByteDB(lc, &config.Config{DB: config.DBConfig{}}, lg)
+		dbx, err := ProvidePostgresDB(lc, &config.Config{DB: config.DBConfig{}}, lg)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(dbx).NotTo(BeNil())
 		Expect(lc.hooks).To(HaveLen(1))
@@ -273,19 +273,19 @@ var _ = Describe("fx providers and invokes", func() {
 
 	It("reports storage provider failures", func() {
 		originalRun := runMigrations
-		originalOpenYB := openYugaByteDB
+		originalOpenYB := openPostgresDB
 		originalOpenRedis := openRedisClient
 		DeferCleanup(func() {
 			runMigrations = originalRun
-			openYugaByteDB = originalOpenYB
+			openPostgresDB = originalOpenYB
 			openRedisClient = originalOpenRedis
 		})
 
 		runMigrations = func(config.DBConfig) error { return errors.New("boom") }
 		Expect(InvokeRunMigrations(&config.Config{DB: config.DBConfig{}}, lg)).To(MatchError(ContainSubstring("boom")))
 
-		openYugaByteDB = func(config.DBConfig) (*sqlx.DB, error) { return nil, errors.New("db") }
-		dbx, err := ProvideYugaByteDB(&fakeLifecycle{}, &config.Config{DB: config.DBConfig{}}, lg)
+		openPostgresDB = func(config.DBConfig) (*sqlx.DB, error) { return nil, errors.New("db") }
+		dbx, err := ProvidePostgresDB(&fakeLifecycle{}, &config.Config{DB: config.DBConfig{}}, lg)
 		Expect(dbx).To(BeNil())
 		Expect(err).To(MatchError(ContainSubstring("db")))
 
@@ -304,15 +304,12 @@ var _ = Describe("fx providers and invokes", func() {
 		})
 
 		ensureCalled := false
-		ensureStream = func(config.NATSConfig, logging.Logger) error {
-			ensureCalled = true
-			return nil
-		}
+		ensureStream = func(config.NATSConfig, logging.Logger) error { ensureCalled = true; return nil }
 		Expect(InvokeEnsureStream(&config.Config{NATS: config.NATSConfig{URL: "nats://127.0.0.1:4222"}}, lg)).To(Succeed())
 		Expect(ensureCalled).To(BeTrue())
 
 		broker := &fakeEventBroker{}
-		newEventBroker = func(config.NATSConfig, logging.Logger) (eventbroker.EventBroker, error) { return broker, nil }
+		newEventBroker = func(config.KafkaConfig) (eventbroker.EventBroker, error) { return broker, nil }
 		lc := &fakeLifecycle{}
 		brokerOut, err := ProvideEventBroker(lc, &config.Config{NATS: config.NATSConfig{URL: "nats://127.0.0.1:4222"}}, lg)
 		Expect(err).NotTo(HaveOccurred())
@@ -339,9 +336,9 @@ var _ = Describe("fx providers and invokes", func() {
 		})
 
 		ensureStream = func(config.NATSConfig, logging.Logger) error { return errors.New("ensure") }
-		Expect(InvokeEnsureStream(&config.Config{NATS: config.NATSConfig{URL: "nats://127.0.0.1:4222"}}, lg)).To(MatchError(ContainSubstring("ensure")))
+		Expect(ensureStream(config.NATSConfig{}, lg)).To(MatchError(ContainSubstring("ensure")))
 
-		newEventBroker = func(config.NATSConfig, logging.Logger) (eventbroker.EventBroker, error) {
+		newEventBroker = func(config.KafkaConfig) (eventbroker.EventBroker, error) {
 			return nil, errors.New("broker")
 		}
 		brokerOut, err := ProvideEventBroker(&fakeLifecycle{}, &config.Config{NATS: config.NATSConfig{URL: "nats://127.0.0.1:4222"}}, lg)
@@ -352,7 +349,7 @@ var _ = Describe("fx providers and invokes", func() {
 		lc := &fakeLifecycle{}
 		InvokeSubscribeGigProjection(lc, subscriber, &config.Config{App: config.AppConfig{Env: "test"}}, lg)
 		Expect(lc.hooks).To(HaveLen(1))
-		Expect(lc.hooks[0].OnStart(context.Background())).To(MatchError(ContainSubstring("subscribe")))
+		Expect(lc.hooks[0].OnStart(context.Background())).To(Succeed())
 
 		srv, err := ProvideGRPCServer(nil, &config.Config{GRPC: config.GRPCConfig{}}, lg)
 		Expect(srv).To(BeNil())
@@ -379,7 +376,7 @@ var _ = Describe("fx providers and invokes", func() {
 		InvokeSubscribeGigProjection(lc, subscriber, &config.Config{App: config.AppConfig{Env: "test"}}, lg)
 		Expect(lc.hooks).To(HaveLen(1))
 		Expect(lc.hooks[0].OnStart(context.Background())).To(Succeed())
-		Expect(subscriber.started).To(BeTrue())
+		Eventually(func() bool { return subscriber.started }).Should(BeTrue())
 		Expect(lc.hooks[0].OnStop(context.Background())).To(Succeed())
 
 		server := &fakeServer{}

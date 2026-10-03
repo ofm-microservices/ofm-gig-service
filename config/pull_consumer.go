@@ -8,6 +8,8 @@ type PullConsumerConfig struct {
 	Stream     string
 	Subject    string
 	Durable    string
+	// GroupID overrides the broker's default subject-derived consumer group.
+	GroupID    string
 	BatchSize  int
 	MaxWait    time.Duration
 	Workers    int

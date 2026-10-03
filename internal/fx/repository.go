@@ -4,8 +4,8 @@ import (
 	app "gig-service/internal/application"
 	"gig-service/internal/domain"
 	readrepo "gig-service/internal/infra/read/redis"
-	writerepo "gig-service/internal/infra/write/yugabyte"
-	events "gig-service/internal/presentation/event_broker/nats"
+	writerepo "gig-service/internal/infra/write/postgres"
+	events "gig-service/internal/presentation/event_broker/kafka"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/ofm-microservices/ofm-common/pkg/logging"
@@ -23,7 +23,7 @@ var RepoModule = fx.Options(
 	),
 )
 
-// ProvideWriteRepo constructs the Yugabyte-backed gig repository.
+// ProvideWriteRepo constructs the PostgreSQL-backed gig repository.
 func ProvideWriteRepo(dbx *sqlx.DB, translator writerepo.DBErrorTranslator, lg logging.Logger) (domain.GigRepository, error) {
 	return writerepo.New(dbx, translator, lg)
 }

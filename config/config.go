@@ -15,6 +15,7 @@ type Config struct {
 	Tracing        TracingConfig
 	Redis          RedisConfig
 	NATS           NATSConfig
+	Kafka          KafkaConfig
 	FileService    FileServiceConfig
 	PaymentService PaymentServiceConfig
 	ReviewService  ReviewServiceConfig

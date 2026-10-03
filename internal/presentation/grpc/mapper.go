@@ -65,6 +65,9 @@ func (m *gigMapper) ToGigResponse(gig *domain.Gig) *gigv1.Gig {
 		PictureUrl:            gig.PictureURL,
 		CreatedAt:             gig.CreatedAt.UTC().Format(timeFormat),
 		UpdatedAt:             gig.UpdatedAt.UTC().Format(timeFormat),
+		Packages:              make([]*gigv1.GigPackage, 0),
+		Questions:             make([]*gigv1.GigQuestion, 0),
+		Media:                 make([]*gigv1.GigMedia, 0),
 	}
 	if gig.PublishedAt != nil {
 		resp.PublishedAt = gig.PublishedAt.UTC().Format(timeFormat)
@@ -287,18 +290,23 @@ func (m *gigMapper) toPublicGigResponse(gig *domain.Gig) *gigv1.Gig {
 	}
 
 	resp := &gigv1.Gig{
-		GigId:          gig.ID,
-		FreelancerId:   gig.FreelancerID,
-		SellerUsername: gig.SellerUsername,
-		Slug:           gig.Slug,
-		Title:          gig.Title,
-		ShortInfo:      gig.ShortInfo,
-		Description:    gig.Description,
-		CategoryId:     gig.CategoryID,
-		Currency:       gig.Currency,
-		PictureUrl:     gig.PictureURL,
-		CreatedAt:      gig.CreatedAt.UTC().Format(timeFormat),
-		UpdatedAt:      gig.UpdatedAt.UTC().Format(timeFormat),
+		GigId:                 gig.ID,
+		FreelancerId:          gig.FreelancerID,
+		SellerUsername:        gig.SellerUsername,
+		Slug:                  gig.Slug,
+		Title:                 gig.Title,
+		ShortInfo:             gig.ShortInfo,
+		Description:           gig.Description,
+		CategoryId:            gig.CategoryID,
+		Currency:              gig.Currency,
+		Status:                gig.Status,
+		BasicInfoCompleted:    gig.BasicInfoCompleted,
+		PackagesCompleted:     gig.PackagesCompleted,
+		RequirementsCompleted: gig.RequirementsCompleted,
+		MediaCompleted:        gig.MediaCompleted,
+		PictureUrl:            gig.PictureURL,
+		CreatedAt:             gig.CreatedAt.UTC().Format(timeFormat),
+		UpdatedAt:             gig.UpdatedAt.UTC().Format(timeFormat),
 	}
 	if gig.PublishedAt != nil {
 		resp.PublishedAt = gig.PublishedAt.UTC().Format(timeFormat)
@@ -324,6 +332,14 @@ func (m *gigMapper) toPublicGigResponse(gig *domain.Gig) *gigv1.Gig {
 				GigId:     item.GigID,
 				Url:       item.URL,
 				SortOrder: item.SortOrder,
+			})
+		}
+	}
+	if len(gig.Questions) > 0 {
+		resp.Questions = make([]*gigv1.GigQuestion, 0, len(gig.Questions))
+		for _, question := range gig.Questions {
+			resp.Questions = append(resp.Questions, &gigv1.GigQuestion{
+				Id: question.ID, GigId: question.GigID, Content: question.Content, SortOrder: question.SortOrder,
 			})
 		}
 	}

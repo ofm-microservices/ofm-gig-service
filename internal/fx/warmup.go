@@ -6,6 +6,7 @@ import (
 	usergrpc "gig-service/internal/infra/user/grpc"
 	"github.com/ofm-microservices/ofm-common/pkg/logging"
 	"go.uber.org/fx"
+	"os"
 )
 
 // InvokeWarmupSellerLookups backfills missing seller usernames and seeds the
@@ -19,6 +20,10 @@ func InvokeWarmupSellerLookups(
 ) {
 	lc.Append(fx.Hook{
 		OnStart: func(context.Context) error {
+			if os.Getenv("GIG_WARMUP_ENABLED") != "true" {
+				lg.Info("gig startup warmup disabled", logging.Operation("gig.bootstrap.warmup.disabled"))
+				return nil
+			}
 			go func() {
 				ctx := context.WithoutCancel(context.Background())
 				gigs, err := repo.ListAll(ctx)

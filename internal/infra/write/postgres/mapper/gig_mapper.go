@@ -2,7 +2,7 @@ package mapper
 
 import (
 	"gig-service/internal/domain"
-	"gig-service/internal/infra/write/yugabyte/model"
+	"gig-service/internal/infra/write/postgres/model"
 )
 
 // MapGigRowToDomain converts a write-model row into the domain aggregate.

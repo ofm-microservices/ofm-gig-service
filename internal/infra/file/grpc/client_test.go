@@ -33,6 +33,14 @@ func (f *fakeFileServiceClient) UploadFile(context.Context, *filev1.UploadFileRe
 	return nil, nil
 }
 
+func (f *fakeFileServiceClient) CreateDirectUpload(context.Context, *filev1.CreateDirectUploadRequest, ...grpc.CallOption) (*filev1.CreateDirectUploadResponse, error) {
+	return nil, nil
+}
+
+func (f *fakeFileServiceClient) CompleteDirectUpload(context.Context, *filev1.CompleteDirectUploadRequest, ...grpc.CallOption) (*filev1.CompleteDirectUploadResponse, error) {
+	return nil, nil
+}
+
 func (f *fakeFileServiceClient) UploadFiles(_ context.Context, req *filev1.UploadFilesRequest, _ ...grpc.CallOption) (*filev1.UploadFilesResponse, error) {
 	f.uploadReq = req
 	return f.uploadRes, f.uploadErr
